@@ -6,5 +6,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     minify: false,
+    target: "es2015",
   },
+  esbuild: {
+    logOverride: { "this-is-undefined-in-esm": "silent" }
+  }
 });
