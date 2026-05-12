@@ -1,0 +1,49 @@
+======================================
+  PADDY LEDGER — PWA Setup Guide
+======================================
+
+WHAT THIS IS
+------------
+A web version of Paddy Ledger that anyone can use on their phone or
+computer by visiting a link — no install required.
+
+STEP 1 — Create a free GitHub account
+--------------------------------------
+Go to https://github.com and sign up (free).
+
+STEP 2 — Upload these files to GitHub
+--------------------------------------
+1. On GitHub, click the "+" icon → "New repository"
+2. Name it "paddy-ledger-pwa", set to Public, click "Create repository"
+3. Click "uploading an existing file"
+4. Drag and drop ALL files from this folder into the browser
+   IMPORTANT: Also drag the "src" and "public" subfolders
+5. Click "Commit changes"
+
+STEP 3 — Deploy with Vercel (free)
+------------------------------------
+1. Go to https://vercel.com and sign up with your GitHub account
+2. Click "Add New Project"
+3. Find "paddy-ledger-pwa" and click Import
+4. Leave all settings as default, click Deploy
+5. Wait ~1 minute — Vercel gives you a live URL like:
+   https://paddy-ledger-pwa.vercel.app
+
+STEP 4 — Share with your friend
+---------------------------------
+Text him the Vercel URL. On his iPhone:
+1. Open the link in Safari
+2. Tap the Share button (box with arrow)
+3. Tap "Add to Home Screen"
+4. Tap "Add"
+It now sits on his home screen like a real app, works offline,
+and his data saves automatically to his phone.
+
+NOTES
+------
+- Each person's data is stored separately on their own device
+- Works on iPhone, Android, and any computer browser
+- Free to host, no monthly fees
+- To update the app: replace files on GitHub, Vercel auto-deploys
+
+======================================
