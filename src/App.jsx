@@ -377,7 +377,7 @@ function PrintModal({ r, onClose }) {
           {/* Header */}
           <div style={{ borderBottom: "3px solid #5a7a1a", paddingBottom: 14, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
             <div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#3a5a0a", letterSpacing: "0.04em" }}>🌾 PADDY LEDGER</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#3a5a0a", letterSpacing: "0.04em" }}>🌾 GOLDEN STATE GROWER</div>
               <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginTop: 3 }}>Field Summary Report</div>
             </div>
             <div style={{ fontSize: 11, color: "#9a9a7a", textAlign: "right" }}>
@@ -460,7 +460,7 @@ function PrintModal({ r, onClose }) {
 
           {/* Footer */}
           <div style={{ marginTop: 28, borderTop: "1px solid #d0d8b0", paddingTop: 10, fontSize: 10, color: "#aaa", letterSpacing: "0.1em", display: "flex", justifyContent: "space-between" }}>
-            <span>PADDY LEDGER — Rice Record Tracker</span>
+            <span>GOLDEN STATE GROWER — Rice Record Tracker</span>
             <span>Field: {r.fieldNumber || "—"} · Variety: {r.variety}</span>
           </div>
         </div>
@@ -708,10 +708,10 @@ function VarietyModal({ records, onClose }) {
     <style>body{font-family:Georgia,serif;color:#1a1a0a;padding:32px 40px}h1{font-size:22px;color:#3a5a0a;margin-bottom:4px}p{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#eef4d8;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4a6a0a;border-bottom:2px solid #c8d880}td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafdf0}.footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between}@media print{@page{margin:.5in}}</style>
     </head><body>
     <h1>🌾 Variety Summary Report</h1>
-    <p>Paddy Ledger · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</p>
+    <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</p>
     <table><thead><tr><th>Variety</th><th style="text-align:right">Fields</th><th style="text-align:right">Total Acres</th><th style="text-align:right">Total Yield (cwt)</th><th style="text-align:right">Avg Yield (cwt/ac)</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="footer"><span>Paddy Ledger — Variety Summary</span><span>Total Acres: ${totalAcres.toFixed(1)}</span></div>
+    <div class="footer"><span>Golden State Grower — Variety Summary</span><span>Total Acres: ${totalAcres.toFixed(1)}</span></div>
     <script>window.onload=()=>window.print()<\/script></body></html>`;
     const win = window.open("","_blank");
     if(win){win.document.write(html);win.document.close();}
@@ -836,9 +836,9 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle}</title>
     <style>body{font-family:Georgia,serif;color:#1a1a0a;padding:32px 40px}h1{font-size:22px;color:#3a5a0a;margin-bottom:4px}p{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#eef4d8;padding:7px 8px;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#4a6a0a;border-bottom:2px solid #c8d880}td{padding:6px 8px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafdf0}.footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between}@media print{@page{margin:.5in}}</style>
     </head><body><h1>🌾 ${reportTitle}</h1>
-    <p>Paddy Ledger · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})} · ${filtered.length} records</p>
+    <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})} · ${filtered.length} records</p>
     <table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>
-    <div class="footer"><span>Paddy Ledger — ${reportTitle}</span><span>${filtered.length} records</span></div>
+    <div class="footer"><span>Golden State Grower — ${reportTitle}</span><span>${filtered.length} records</span></div>
     </body></html>`;
     const win = window.open("","_blank");
     if(win){win.document.write(html);win.document.close();}
@@ -973,7 +973,7 @@ function YoYModal({ records, allYears, onClose }) {
       @media print { @page { margin: 0.5in; } }
     </style></head><body>
     <h1>🌾 Year-over-Year Field Report</h1>
-    <p>Paddy Ledger · Printed ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+    <p>Golden State Grower · Printed ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
     <table>
       <thead><tr>
         <th>Field</th><th>Year</th><th>Variety</th><th>Planted</th><th>Harvest</th>
@@ -981,7 +981,7 @@ function YoYModal({ records, allYears, onClose }) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="footer"><span>Paddy Ledger — Year-over-Year Report</span><span>${allYears.join(", ")}</span></div>
+    <div class="footer"><span>Golden State Grower — Year-over-Year Report</span><span>${allYears.join(", ")}</span></div>
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`;
     const win = window.open("", "_blank");
@@ -1235,7 +1235,7 @@ export default function App({ user }) {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
             <span style={{ fontSize: 36, lineHeight: 1 }}>🌾</span>
-            <h1 style={{ margin: 0, fontSize: "clamp(22px, 4vw, 38px)", fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e", textShadow: "0 2px 12px rgba(160,180,60,0.3)" }}>PADDY LEDGER</h1>
+            <h1 style={{ margin: 0, fontSize: "clamp(22px, 4vw, 38px)", fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e", textShadow: "0 2px 12px rgba(160,180,60,0.3)" }}>GOLDEN STATE GROWER</h1>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#8a9e5a", letterSpacing: "0.15em", textTransform: "uppercase" }}>Rice Record Tracker</p>
         </div>
