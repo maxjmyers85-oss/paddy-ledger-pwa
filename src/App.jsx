@@ -841,9 +841,10 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     { key:"plantYear",       label:"Plant Year",            group:"General" },
     { key:"yieldDate",       label:"Harvest Date",          group:"General" },
     { key:"growthDays",      label:"Growth Days",           group:"General" },
-    { key:"yield_lbs",       label:"Yield (lbs)",           group:"General" },
-    { key:"yield_cwt",       label:"Yield (cwt)",           group:"General" },
-    { key:"yield_cwtac",     label:"Yield (cwt/ac)",        group:"General" },
+    { key:"yield_raw",        label:"Yield (with units)",    group:"General" },
+    { key:"yield_lbs",       label:"Yield (raw number)",    group:"General" },
+    { key:"yield_cwt",       label:"Yield (cwt, rice)",     group:"General" },
+    { key:"yield_cwtac",     label:"Yield (cwt/ac, rice)",  group:"General" },
     { key:"notes",           label:"Notes",                 group:"General" },
     { key:"aquaRate",        label:"Aqua Rate (gal/ac)",    group:"Fertilizer" },
     { key:"aquaDate",        label:"Aqua Date",             group:"Fertilizer" },
@@ -881,7 +882,7 @@ function ReportBuilderModal({ records, allYears, onClose }) {
 
   const GROUPS = [...new Set(COLUMNS.map(c=>c.group))];
 
-  const [selectedCols, setSelectedCols] = React.useState(["cropType","fieldNumber","variety","acres","plantDate","plantYear","yieldDate","yield_cwt","yield_cwtac"]);
+  const [selectedCols, setSelectedCols] = React.useState(["cropType","fieldNumber","variety","acres","plantDate","plantYear","yieldDate","yield_raw","notes"]);
   const [filterYear,    setFilterYear]    = React.useState("all");
   const [filterCrop,    setFilterCrop]    = React.useState("all");
   const [filterVariety, setFilterVariety] = React.useState("all");
@@ -897,6 +898,7 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
     if (key === "cropType") return (CROP_CONFIGS[r.cropType||"rice"]||{label:r.cropType||"Rice"}).label;
     if (key === "growthDays") { if(!r.plantDate||!r.yieldDate) return "—"; return Math.round((new Date(r.yieldDate)-new Date(r.plantDate))/86400000)+"d"; }
+    if (key === "yield_raw") { if(!r.yield_lbs||r.yield_lbs<=0) return "—"; const cfg=CROP_CONFIGS[r.cropType||"rice"]||CROP_CONFIGS.rice; return `${Number(r.yield_lbs).toLocaleString()} ${cfg.yieldLabel.includes("tons")?"tons":"lbs"}`; }
     if (key === "yield_cwt") return r.yield_lbs>0?(r.yield_lbs/100).toFixed(1):"—";
     if (key === "yield_cwtac") { const ac=parseFloat(r.acres)||0; return r.yield_lbs>0&&ac>0?(r.yield_lbs/100/ac).toFixed(1):"—"; }
     if (["plantDate","yieldDate","aquaDate","starterDate","topdressDate","preplantDate","sidedressDate","dormantDate","springDate","hullSplitDate"].includes(key)) return r[key]?formatDate(r[key]):"—";
@@ -1052,12 +1054,38 @@ function ReportBuilderModal({ records, allYears, onClose }) {
 
 // ── Year-over-Year Report Modal ───────────────────────────────────────────────
 function YoYModal({ records, allYears, onClose }) {
-  const fieldNames = [...new Set(records.map(r => r.fieldNumber).filter(Boolean))].sort();
+  const [filterCrop, setFilterCrop] = React.useState("all");
+  const allCropsInRecords = [...new Set(records.map(r => r.cropType||"rice"))].sort();
 
-  const getYear = r => r.plantDate ? new Date(r.plantDate).getFullYear() : null;
+  const getYear = r => {
+    if (r.plantYear) return parseInt(r.plantYear);
+    if (r.plantDate) return new Date(r.plantDate).getFullYear();
+    return null;
+  };
 
+  const recordNPK = r => {
+    const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+    const secNPKs = rcfg.fertSections.map(sec => calcSectionNPK(r, sec)).filter(Boolean);
+    const fNPK = calcFertigationLogNPK(r);
+    const base = secNPKs.reduce((acc, [n,p,k]) => [acc[0]+n, acc[1]+p, acc[2]+k], [0,0,0]);
+    return [base[0]+fNPK[0], base[1]+fNPK[1], base[2]+fNPK[2]];
+  };
+
+  const plantedLabel = r => {
+    if (r.plantYear) return r.plantYear;
+    if (r.plantDate) return formatDate(r.plantDate);
+    return "—";
+  };
+
+  const yieldLabel = r => {
+    const cfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+    if (!r.yield_lbs || r.yield_lbs <= 0) return "—";
+    return `${Number(r.yield_lbs).toLocaleString()} ${cfg.yieldLabel.includes("tons") ? "tons" : "lbs"}`;
+  };
+
+  const filteredRecords = filterCrop === "all" ? records : records.filter(r => (r.cropType||"rice") === filterCrop);
+  const fieldNames = [...new Set(filteredRecords.map(r => r.fieldNumber).filter(Boolean))].sort();
   const fmt1 = v => v > 0 ? v.toFixed(1) : "—";
-  const fmtN = v => v || "—";
 
   const thStyle = { padding: "8px 12px", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8a9e5a", borderBottom: "2px solid #3a4a1a", textAlign: "left", whiteSpace: "nowrap" };
   const tdStyle = { padding: "8px 12px", fontSize: 13, borderBottom: "1px solid #2a3a0a", color: "#e8e0c8" };
@@ -1066,83 +1094,74 @@ function YoYModal({ records, allYears, onClose }) {
   const printYoY = () => {
     const rows = fieldNames.flatMap(field =>
       allYears.map(year => {
-        const r = records.find(x => x.fieldNumber === field && getYear(x) === year);
-        if (!r) return `<tr><td>${field}</td><td>${year}</td><td colspan="8" style="color:#aaa;font-style:italic">No data</td></tr>`;
-        const [totN, totP, totK] = calcNPKTotal(r);
-        const days = daysUntilHarvest(r.plantDate, r.yieldDate);
+        const r = filteredRecords.find(x => x.fieldNumber === field && getYear(x) === year);
+        if (!r) return `<tr><td>${field}</td><td>${year}</td><td colspan="9" style="color:#aaa;font-style:italic">No data</td></tr>`;
+        const [totN, totP, totK] = recordNPK(r);
+        const days = !r.plantYear && r.plantDate && r.yieldDate ? Math.round((new Date(r.yieldDate)-new Date(r.plantDate))/86400000) : null;
+        const cfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
         return `<tr>
           <td>${field}</td><td>${year}</td>
-          <td>${r.variety || "—"}</td>
-          <td>${formatDate(r.plantDate)}</td>
-          <td>${formatDate(r.yieldDate)}</td>
-          <td>${days !== null ? days + "d" : "—"}</td>
-<td>${r.yield_lbs > 0 ? Number(r.yield_lbs).toLocaleString() + " lbs" : "—"}</td>
-          <td>${r.yield_lbs > 0 ? (r.yield_lbs/100).toFixed(1) + " cwt" : "—"}</td>
-          <td>${(r.yield_lbs > 0 && r.acres > 0) ? (r.yield_lbs/100/parseFloat(r.acres)).toFixed(1) + " cwt/ac" : "—"}</td>
-          <td>${fmt1(totN)}</td><td>${fmt1(totP)}</td><td>${fmt1(totK)}</td>
+          <td>${(CROP_CONFIGS[r.cropType||"rice"]||{label:"Rice"}).label}</td>
+          <td>${r.variety||"—"}</td>
+          <td>${plantedLabel(r)}</td>
+          <td>${r.yieldDate?formatDate(r.yieldDate):"—"}</td>
+          <td style="text-align:right">${days!==null?days+"d":"—"}</td>
+          <td style="text-align:right">${yieldLabel(r)}</td>
+          <td style="text-align:right">${fmt1(totN)}</td>
+          <td style="text-align:right">${fmt1(totP)}</td>
+          <td style="text-align:right">${fmt1(totK)}</td>
         </tr>`;
       })
     ).join("");
-
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
     <title>Year-over-Year Field Report</title>
-    <style>
-      body { font-family: Georgia, serif; color: #1a1a0a; padding: 32px 40px; }
-      h1 { font-size: 22px; color: #3a5a0a; margin-bottom: 4px; }
-      p { font-size: 11px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 24px; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th { background: #eef4d8; padding: 8px 10px; text-align: left; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #4a6a0a; border-bottom: 2px solid #c8d880; }
-      td { padding: 7px 10px; border-bottom: 1px solid #eee; }
-      tr:nth-child(even) td { background: #fafdf0; }
-      .footer { margin-top: 24px; font-size: 10px; color: #aaa; border-top: 1px solid #ddd; padding-top: 10px; display: flex; justify-content: space-between; }
-      @media print { @page { margin: 0.5in; } }
-    </style></head><body>
-    <h1>🌾 Year-over-Year Field Report</h1>
-    <p>Golden State Grower · Printed ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
-    <table>
-      <thead><tr>
-        <th>Field</th><th>Year</th><th>Variety</th><th>Planted</th><th>Harvest</th>
-        <th>Days</th><th>Yield (lbs)</th><th>Yield (cwt)</th><th>cwt/ac</th><th>N (lbs/ac)</th><th>P (lbs/ac)</th><th>K (lbs/ac)</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
+    <style>body{font-family:Georgia,serif;color:#1a1a0a;padding:32px 40px}h1{font-size:22px;color:#3a5a0a;margin-bottom:4px}p{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#eef4d8;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4a6a0a;border-bottom:2px solid #c8d880}td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafdf0}.footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between}@media print{@page{margin:.5in}}</style>
+    </head><body>
+    <h1>📊 Year-over-Year Field Report</h1>
+    <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</p>
+    <table><thead><tr><th>Field</th><th>Year</th><th>Crop</th><th>Variety</th><th>Planted</th><th>Harvest</th><th style="text-align:right">Days</th><th style="text-align:right">Yield</th><th style="text-align:right">N (lbs/ac)</th><th style="text-align:right">P (lbs/ac)</th><th style="text-align:right">K (lbs/ac)</th></tr></thead>
+    <tbody>${rows}</tbody></table>
     <div class="footer"><span>Golden State Grower — Year-over-Year Report</span><span>${allYears.join(", ")}</span></div>
-    <script>window.onload=()=>window.print()<\/script>
-    </body></html>`;
-    const win = window.open("", "_blank");
-    if (win) { win.document.write(html); win.document.close(); }
+    <script>window.onload=()=>window.print()<\/script></body></html>`;
+    const win = window.open("","_blank");
+    if(win){win.document.write(html);win.document.close();}
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "#1e2a0e", border: "1px solid #3a4a1a", width: "100%", maxWidth: 960, borderRadius: 4, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"24px 16px",overflowY:"auto" }}
+      onClick={e => e.target===e.currentTarget && onClose()}>
+      <div style={{ background:"#1e2a0e",border:"1px solid #3a4a1a",width:"100%",maxWidth:1060,borderRadius:4,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
 
-        <div style={{ background: "#2a4a0a", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ color: "#c8d86e", fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>📊 Year-over-Year Field Report</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={printYoY}
-              style={{ background: "#7a9a2a", border: "none", color: "#fff", padding: "7px 18px", fontSize: 12, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-              Print / Save PDF
-            </button>
-            <button onClick={onClose}
-              style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "7px 14px", fontSize: 12, fontFamily: "inherit", cursor: "pointer", borderRadius: 2 }}>
-              ✕ Close
-            </button>
+        <div style={{ background:"#2a4a0a",padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+          <span style={{ color:"#c8d86e",fontSize:13,letterSpacing:"0.1em",textTransform:"uppercase" }}>📊 Year-over-Year Field Report</span>
+          <div style={{ display:"flex",gap:8 }}>
+            <button onClick={printYoY} style={{ background:"#7a9a2a",border:"none",color:"#fff",padding:"7px 18px",fontSize:12,fontFamily:"inherit",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase",borderRadius:2 }}>Print / PDF</button>
+            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",padding:"7px 14px",fontSize:12,fontFamily:"inherit",cursor:"pointer",borderRadius:2 }}>✕ Close</button>
           </div>
         </div>
 
+        {/* Crop filter */}
+        <div style={{ padding:"12px 24px",borderBottom:"1px solid #2a3a0a",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
+          <span style={{ fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",color:"#7a8e4a" }}>Filter by crop:</span>
+          {[["all","All Crops"],...allCropsInRecords.map(c=>[c,(CROP_CONFIGS[c]||{label:c,icon:""}).icon+" "+(CROP_CONFIGS[c]||{label:c}).label])].map(([val,label]) => (
+            <button key={val} onClick={()=>setFilterCrop(val)}
+              style={{ background:filterCrop===val?"#3a6a1a":"rgba(255,255,255,0.04)",border:`1px solid ${filterCrop===val?"#5a9a2a":"#2a3a0a"}`,color:filterCrop===val?"#c8d86e":"#7a8e4a",padding:"5px 12px",fontSize:11,fontFamily:"inherit",cursor:"pointer",borderRadius:2,transition:"all 0.15s" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         {fieldNames.length === 0 ? (
-          <div style={{ padding: 48, textAlign: "center", color: "#5a6e2a" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-            <p style={{ fontSize: 14 }}>No field records found. Add records with field numbers to see the year-over-year report.</p>
+          <div style={{ padding:48,textAlign:"center",color:"#5a6e2a" }}>
+            <div style={{ fontSize:40,marginBottom:12 }}>📋</div>
+            <p style={{ fontSize:14 }}>No field records found for the selected crop. Add records with field numbers to use this report.</p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto", padding: "0 0 24px" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+          <div style={{ overflowX:"auto",padding:"0 0 24px" }}>
+            <table style={{ width:"100%",borderCollapse:"collapse",minWidth:800 }}>
               <thead>
-                <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                  {["Field", "Year", "Variety", "Planted", "Harvest", "Days", "Yield", "N (lbs/ac)", "P (lbs/ac)", "K (lbs/ac)"].map(h => (
+                <tr style={{ background:"rgba(255,255,255,0.04)" }}>
+                  {["Field","Year","Crop","Variety","Planted","Harvest","Days","Yield","N (lbs/ac)","P (lbs/ac)","K (lbs/ac)"].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -1150,27 +1169,28 @@ function YoYModal({ records, allYears, onClose }) {
               <tbody>
                 {fieldNames.flatMap(field =>
                   allYears.map((year, yi) => {
-                    const r = records.find(x => x.fieldNumber === field && getYear(x) === year);
+                    const r = filteredRecords.find(x => x.fieldNumber === field && getYear(x) === year);
                     const isFirst = yi === 0;
-                    const [totN, totP, totK] = r ? calcNPKTotal(r) : [0,0,0];
-                    const days = r ? daysUntilHarvest(r.plantDate, r.yieldDate) : null;
+                    const [totN, totP, totK] = r ? recordNPK(r) : [0,0,0];
+                    const days = r && !r.plantYear && r.plantDate && r.yieldDate
+                      ? Math.round((new Date(r.yieldDate)-new Date(r.plantDate))/86400000) : null;
+                    const cropCfg = r ? (CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice) : null;
                     return (
-                      <tr key={field+year} style={{ background: isFirst ? "rgba(255,255,255,0.03)" : "transparent" }}>
-                        <td style={{ padding:"8px 12px",fontSize:13,borderBottom:"1px solid #2a3a0a",color:"#aac8e8",fontWeight:600 }}>{isFirst ? field : ""}</td>
+                      <tr key={field+year} style={{ background:isFirst?"rgba(255,255,255,0.03)":"transparent" }}>
+                        <td style={{ padding:"8px 12px",fontSize:13,borderBottom:"1px solid #2a3a0a",color:"#aac8e8",fontWeight:600 }}>{isFirst?field:""}</td>
                         <td style={{ padding:"8px 12px",fontSize:13,borderBottom:"1px solid #2a3a0a",color:"#c8d86e" }}>{year}</td>
                         {r ? <>
-                          <td style={tdStyle}>{r.variety || "—"}</td>
-                          <td style={tdStyle}>{formatDate(r.plantDate)}</td>
-                          <td style={tdStyle}>{formatDate(r.yieldDate)}</td>
-                          <td style={tdNum}>{days !== null ? days + "d" : "—"}</td>
-<td style={tdNum}>{r.yield_lbs > 0 ? Number(r.yield_lbs).toLocaleString() + " lbs" : "—"}</td>
-                          <td style={tdNum}>{r.yield_lbs > 0 ? (r.yield_lbs/100).toFixed(1) : "—"}</td>
-                          <td style={tdNum}>{(r.yield_lbs > 0 && r.acres > 0) ? (r.yield_lbs/100/parseFloat(r.acres)).toFixed(1) : "—"}</td>
+                          <td style={tdStyle}>{cropCfg?.icon} {cropCfg?.label}</td>
+                          <td style={tdStyle}>{r.variety||"—"}</td>
+                          <td style={tdStyle}>{plantedLabel(r)}</td>
+                          <td style={tdStyle}>{r.yieldDate?formatDate(r.yieldDate):"—"}</td>
+                          <td style={tdNum}>{days!==null?days+"d":"—"}</td>
+                          <td style={tdNum}>{yieldLabel(r)}</td>
                           <td style={tdNum}>{fmt1(totN)}</td>
                           <td style={tdNum}>{fmt1(totP)}</td>
                           <td style={tdNum}>{fmt1(totK)}</td>
                         </> : (
-                          <td colSpan={8} style={{ padding:"8px 12px",fontSize:13,borderBottom:"1px solid #2a3a0a",color:"#4a5a2a",fontStyle:"italic" }}>No data for this year</td>
+                          <td colSpan={9} style={{ padding:"8px 12px",fontSize:13,borderBottom:"1px solid #2a3a0a",color:"#4a5a2a",fontStyle:"italic" }}>No data for this year</td>
                         )}
                       </tr>
                     );
