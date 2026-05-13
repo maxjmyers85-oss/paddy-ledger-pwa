@@ -1,6 +1,141 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
 
+// ── Fertilizer section templates ─────────────────────────────────────────────
+const FS = {
+  aqua: {
+    label: "▸ Aqua Ammonia", headerColor: "#4a8a7a",
+    borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
+    cardLabel: "💧 Aqua Ammonia", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    fields: [
+      { label: "Analysis (N-P-K)", field: "aquaAnalysis", type: "text" },
+      { label: "Rate (gal/ac)", field: "aquaRate", type: "number" },
+      { label: "Date", field: "aquaDate", type: "date" },
+    ],
+  },
+  starter: {
+    label: "▸ Starter Fertilizer", headerColor: "#8a7a3a",
+    borderColor: "#6a5a1a", bg: "rgba(120,100,40,0.07)", labelColor: "#9a8e4a",
+    cardLabel: "🌱 Starter", cardColor: "#7a6a2a", valueColor: "#c8aa4e",
+    fields: [
+      { label: "Product", field: "starterProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "starterAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "starterRate", type: "number" },
+      { label: "Date", field: "starterDate", type: "date" },
+    ],
+  },
+  topdress: {
+    label: "▸ Topdress", headerColor: "#7a6a9a",
+    borderColor: "#5a4a7a", bg: "rgba(100,80,140,0.07)", labelColor: "#9a8ebc",
+    cardLabel: "⬆️ Topdress", cardColor: "#6a5a8a", valueColor: "#a890d8",
+    fields: [
+      { label: "Product", field: "topdressProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "topdressAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "topdressRate", type: "number" },
+      { label: "Date", field: "topdressDate", type: "date" },
+    ],
+  },
+  preplant: {
+    label: "▸ Preplant (Broadcast)", headerColor: "#8a7a3a",
+    borderColor: "#6a5a1a", bg: "rgba(120,100,40,0.07)", labelColor: "#9a8e4a",
+    cardLabel: "🌱 Preplant", cardColor: "#7a6a2a", valueColor: "#c8aa4e",
+    fields: [
+      { label: "Product", field: "preplantProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "preplantAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "preplantRate", type: "number" },
+      { label: "Date", field: "preplantDate", type: "date" },
+    ],
+  },
+  fert1: {
+    label: "▸ Fertigation #1", headerColor: "#4a8a7a",
+    borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
+    cardLabel: "💧 Fertigation #1", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    fields: [
+      { label: "Product", field: "fert1Product", type: "text" },
+      { label: "Analysis (N-P-K)", field: "fert1Analysis", type: "text" },
+      { label: "Rate (gal/ac)", field: "fert1Rate", type: "number" },
+      { label: "Date", field: "fert1Date", type: "date" },
+    ],
+  },
+  fert2: {
+    label: "▸ Fertigation #2", headerColor: "#4a7a8a",
+    borderColor: "#2a5a6a", bg: "rgba(60,100,120,0.07)", labelColor: "#5a8e9e",
+    cardLabel: "💧 Fertigation #2", cardColor: "#3a6a7a", valueColor: "#6ab8d0",
+    fields: [
+      { label: "Product", field: "fert2Product", type: "text" },
+      { label: "Analysis (N-P-K)", field: "fert2Analysis", type: "text" },
+      { label: "Rate (gal/ac)", field: "fert2Rate", type: "number" },
+      { label: "Date", field: "fert2Date", type: "date" },
+    ],
+  },
+  fert3: {
+    label: "▸ Fertigation #3", headerColor: "#5a6a8a",
+    borderColor: "#3a4a6a", bg: "rgba(80,100,140,0.07)", labelColor: "#7a8eae",
+    cardLabel: "💧 Fertigation #3", cardColor: "#4a5a7a", valueColor: "#8aaad0",
+    fields: [
+      { label: "Product", field: "fert3Product", type: "text" },
+      { label: "Analysis (N-P-K)", field: "fert3Analysis", type: "text" },
+      { label: "Rate (gal/ac)", field: "fert3Rate", type: "number" },
+      { label: "Date", field: "fert3Date", type: "date" },
+    ],
+  },
+  sidedress: {
+    label: "▸ Sidedress (V4–V6)", headerColor: "#7a6a9a",
+    borderColor: "#5a4a7a", bg: "rgba(100,80,140,0.07)", labelColor: "#9a8ebc",
+    cardLabel: "↕️ Sidedress", cardColor: "#6a5a8a", valueColor: "#a890d8",
+    fields: [
+      { label: "Product", field: "sidedressProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "sidedressAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "sidedressRate", type: "number" },
+      { label: "Date", field: "sidedressDate", type: "date" },
+    ],
+  },
+  dormant: {
+    label: "▸ Dormant Application (Jan–Feb)", headerColor: "#6a7a9a",
+    borderColor: "#4a5a7a", bg: "rgba(80,100,140,0.07)", labelColor: "#8a9ebc",
+    cardLabel: "❄️ Dormant", cardColor: "#5a6a8a", valueColor: "#9aaad0",
+    fields: [
+      { label: "Product", field: "dormantProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "dormantAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "dormantRate", type: "number" },
+      { label: "Date", field: "dormantDate", type: "date" },
+    ],
+  },
+  spring: {
+    label: "▸ Spring Application (Post-Bloom)", headerColor: "#5a8a4a",
+    borderColor: "#3a6a2a", bg: "rgba(80,140,60,0.07)", labelColor: "#7aae6a",
+    cardLabel: "🌸 Spring App.", cardColor: "#4a7a3a", valueColor: "#90d870",
+    fields: [
+      { label: "Product", field: "springProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "springAnalysis", type: "text" },
+      { label: "Rate (lbs/ac)", field: "springRate", type: "number" },
+      { label: "Date", field: "springDate", type: "date" },
+    ],
+  },
+  fertigation: {
+    label: "▸ Fertigation (Season)", headerColor: "#4a8a7a",
+    borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
+    cardLabel: "💧 Fertigation", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    fields: [
+      { label: "Product", field: "fertigationProduct", type: "text" },
+      { label: "Analysis (N-P-K)", field: "fertigationAnalysis", type: "text" },
+      { label: "Rate (gal/ac/app)", field: "fertigationRate", type: "number" },
+      { label: "# Applications", field: "fertigationApps", type: "number" },
+      { label: "Start Date", field: "fertigationDate", type: "date" },
+    ],
+  },
+  foliar: {
+    label: "▸ Foliar Spray (Zinc / Boron)", headerColor: "#8a6a4a",
+    borderColor: "#6a4a2a", bg: "rgba(140,100,60,0.07)", labelColor: "#ae8a6a",
+    cardLabel: "🌿 Foliar", cardColor: "#7a5a3a", valueColor: "#d0a870",
+    fields: [
+      { label: "Product", field: "foliarProduct", type: "text" },
+      { label: "Rate (lbs/ac)", field: "foliarRate", type: "number" },
+      { label: "Date", field: "foliarDate", type: "date" },
+    ],
+  },
+};
+
 const CROP_CONFIGS = {
   rice: {
     label: "Rice", icon: "🌾",
@@ -10,50 +145,62 @@ const CROP_CONFIGS = {
       { label: "CA Long Grain", items: ["L-204","L-205","L-206"] },
       { label: "Other", items: ["Jasmine","Basmati","Arborio","Glutinous","Brown Rice","Wild Rice","Other"] },
     ],
-    yieldLabel: "Total Harvest (lbs)", showAqua: true,
+    yieldLabel: "Total Harvest (lbs)",
     extraFields: [],
+    fertSections: [FS.aqua, FS.starter, FS.topdress],
+    showNPK: true,
   },
   tomatoes: {
     label: "Processing Tomatoes", icon: "🍅",
     varieties: ["Heinz 2401","Heinz 3402","AB2","Halley 3155","Escalon","Peto 696","Other"],
-    yieldLabel: "Total Harvest (tons)", showAqua: false,
+    yieldLabel: "Total Harvest (tons)",
     extraFields: [
       { label: "Brix", field: "brix", type: "number" },
       { label: "Processor / Contract", field: "processor", type: "text" },
     ],
+    fertSections: [FS.preplant, FS.fert1, FS.fert2, FS.fert3, FS.sidedress],
+    showNPK: false,
   },
   wheat: {
     label: "Wheat", icon: "🌿",
     varieties: ["WB4458","WB4303","Yecora Rojo","Patwin","UC Drought Tolerant","Other"],
-    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    yieldLabel: "Total Harvest (lbs)",
     extraFields: [
       { label: "Seeding Rate (lbs/ac)", field: "seedingRate", type: "number" },
       { label: "Protein %", field: "protein", type: "number" },
       { label: "Test Weight (lbs/bu)", field: "testWeight", type: "number" },
     ],
+    fertSections: [FS.starter, FS.topdress],
+    showNPK: false,
   },
   corn: {
     label: "Corn", icon: "🌽",
     varieties: ["DeKalb DKC","Pioneer P","NK Brand","Syngenta","Other"],
-    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    yieldLabel: "Total Harvest (lbs)",
     extraFields: [
       { label: "Population (seeds/ac)", field: "population", type: "number" },
     ],
+    fertSections: [FS.starter, FS.sidedress, FS.topdress],
+    showNPK: false,
   },
   almonds: {
     label: "Almonds", icon: "🌰",
     varieties: ["Nonpareil","Carmel","Butte","Padre","Wood Colony","Independence","Shasta","Other"],
-    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    yieldLabel: "Total Harvest (lbs)",
     extraFields: [
       { label: "Bloom Date", field: "bloomDate", type: "date" },
       { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
     ],
+    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    showNPK: false,
   },
   sunflowers: {
     label: "Sunflowers", icon: "🌻",
     varieties: ["Croplan","Dekalb","Pioneer","Triumph","Other"],
-    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    yieldLabel: "Total Harvest (lbs)",
     extraFields: [],
+    fertSections: [FS.starter, FS.topdress],
+    showNPK: false,
   },
 };
 
@@ -80,11 +227,25 @@ const statusColor = (days) => {
 const emptyForm = {
   cropType: "rice",
   fieldNumber: "", variety: "", plantDate: "", yieldDate: "", acres: "", yield_lbs: "", notes: "",
+  // rice
   aquaAnalysis: "20-0-0", aquaRate: "", aquaDate: "",
   starterProduct: "", starterAnalysis: "", starterRate: "", starterDate: "",
   topdressProduct: "", topdressAnalysis: "", topdressRate: "", topdressDate: "",
+  // tomatoes
+  preplantProduct: "", preplantAnalysis: "", preplantRate: "", preplantDate: "",
+  fert1Product: "", fert1Analysis: "", fert1Rate: "", fert1Date: "",
+  fert2Product: "", fert2Analysis: "", fert2Rate: "", fert2Date: "",
+  fert3Product: "", fert3Analysis: "", fert3Rate: "", fert3Date: "",
+  sidedressProduct: "", sidedressAnalysis: "", sidedressRate: "", sidedressDate: "",
+  // almonds
+  dormantProduct: "", dormantAnalysis: "", dormantRate: "", dormantDate: "",
+  springProduct: "", springAnalysis: "", springRate: "", springDate: "",
+  fertigationProduct: "", fertigationAnalysis: "", fertigationRate: "", fertigationApps: "", fertigationDate: "",
+  foliarProduct: "", foliarRate: "", foliarDate: "",
+  // herbicides
   herbicideName: "", herbicideRate: "", herbicideUnit: "gal", herbicideDate: "",
   herb2Name: "", herb2Rate: "", herb2Unit: "gal", herb2Date: "",
+  // crop-specific extras
   brix: "", processor: "", seedingRate: "", protein: "", testWeight: "",
   population: "", bloomDate: "", hullSplitDate: "",
 };
@@ -1167,33 +1328,13 @@ export default function App({ user }) {
             );
           })()}
 
-          {(CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice).showAqua && <>
-            <SectionHeader color="#4a8a7a" label="▸ Fertilizer — Aqua" />
-            <FertBox borderColor="#2a6a5a" bg="rgba(60,120,100,0.07)" labelColor="#5a9e8a"
-              fields={[
-                { label: "Analysis (N-P-K)", field: "aquaAnalysis", type: "text" },
-                { label: "Aqua Rate (gal/ac)", field: "aquaRate", type: "number" },
-                { label: "Aqua Date", field: "aquaDate", type: "date" },
-              ]} form={form} setForm={setForm} />
-          </>}
-
-          <SectionHeader color="#8a7a3a" label="▸ Fertilizer — Starter" />
-          <FertBox borderColor="#6a5a1a" bg="rgba(120,100,40,0.07)" labelColor="#9a8e4a"
-            fields={[
-              { label: "Product", field: "starterProduct", type: "text" },
-              { label: "Analysis (N-P-K)", field: "starterAnalysis", type: "text" },
-              { label: "Starter Rate (lbs/ac)", field: "starterRate", type: "number" },
-              { label: "Starter Date", field: "starterDate", type: "date" },
-            ]} form={form} setForm={setForm} />
-
-          <SectionHeader color="#7a6a9a" label="▸ Fertilizer — Topdress" />
-          <FertBox borderColor="#5a4a7a" bg="rgba(100,80,140,0.07)" labelColor="#9a8ebc"
-            fields={[
-              { label: "Product", field: "topdressProduct", type: "text" },
-              { label: "Analysis (N-P-K)", field: "topdressAnalysis", type: "text" },
-              { label: "Topdress Rate (lbs/ac)", field: "topdressRate", type: "number" },
-              { label: "Topdress Date", field: "topdressDate", type: "date" },
-            ]} form={form} setForm={setForm} />
+          {(CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice).fertSections.map((sec, i) => (
+            <React.Fragment key={i}>
+              <SectionHeader color={sec.headerColor} label={sec.label} />
+              <FertBox borderColor={sec.borderColor} bg={sec.bg} labelColor={sec.labelColor}
+                fields={sec.fields} form={form} setForm={setForm} />
+            </React.Fragment>
+          ))}
 
           <SectionHeader color="#8a4a3a" label="▸ First Herbicide" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24, padding: "16px", background: "rgba(140,60,40,0.07)", borderLeft: "3px solid #6a2a1a", borderRadius: 2 }}>
@@ -1279,7 +1420,8 @@ export default function App({ user }) {
         {filtered.map(r => {
           const days = daysUntilHarvest(r.plantDate, r.yieldDate);
           const sc = statusColor(days);
-          const hasFert = r.aquaRate || r.aquaDate || r.starterRate || r.starterDate || r.topdressRate || r.topdressDate;
+          const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+          const hasFert = rcfg.fertSections.some(sec => sec.fields.some(f => r[f.field]));
           const hasHerb = r.herbicideName || r.herbicideRate || r.herbicideDate;
           const hasHerb2 = r.herb2Name || r.herb2Rate || r.herb2Date;
           return (
@@ -1346,24 +1488,25 @@ export default function App({ user }) {
                 );
               })()}
 
-              {/* Fertilizer */}
-              {hasFert && (
-                <CardSection label="💧 Fertilizer" color="#4a7a6a">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {r.aquaRate && <StatBlock label="Aqua Rate" value={`${r.aquaRate} gal/ac`} icon="💧" valueColor="#5ab8a0" />}
-                    {r.aquaDate && <StatBlock label="Aqua Date" value={formatDate(r.aquaDate)} icon="📆" valueColor="#5ab8a0" />}
-                    {r.starterProduct && <StatBlock label="Starter Product" value={r.starterProduct} icon="🏷" valueColor="#c8aa4e" />}
-                    {r.starterRate && <StatBlock label="Starter Rate" value={`${r.starterRate} lbs/ac`} icon="🌿" valueColor="#c8aa4e" />}
-                    {r.starterDate && <StatBlock label="Starter Date" value={formatDate(r.starterDate)} icon="📆" valueColor="#c8aa4e" />}
-                    {r.topdressProduct && <StatBlock label="Topdress Product" value={r.topdressProduct} icon="🏷" valueColor="#a890d8" />}
-                    {r.topdressRate && <StatBlock label="Topdress Rate" value={`${r.topdressRate} lbs/ac`} icon="🪣" valueColor="#a890d8" />}
-                    {r.topdressDate && <StatBlock label="Topdress Date" value={formatDate(r.topdressDate)} icon="📆" valueColor="#a890d8" />}
-                  </div>
-                </CardSection>
-              )}
+              {/* Fertilizer — dynamic per crop */}
+              {rcfg.fertSections.map((sec, si) => {
+                const filled = sec.fields.filter(f => r[f.field]);
+                if (!filled.length) return null;
+                return (
+                  <CardSection key={si} label={sec.cardLabel} color={sec.cardColor}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {filled.map(f => (
+                        <StatBlock key={f.field} label={f.label}
+                          value={f.type === "date" ? formatDate(r[f.field]) : r[f.field]}
+                          icon="💧" valueColor={sec.valueColor} />
+                      ))}
+                    </div>
+                  </CardSection>
+                );
+              })}
 
-              {/* Fertilizer Totals */}
-              {(r.aquaRate || r.starterRate || r.topdressRate) && (() => {
+              {/* Fertilizer Totals — rice only */}
+              {rcfg.showNPK && (r.aquaRate || r.starterRate || r.topdressRate) && (() => {
                 const [aN, aP, aK] = calcNPK(r.aquaRate, r.aquaAnalysis || "20-0-0", true);
                 const [sN, sP, sK] = calcNPK(r.starterRate, r.starterAnalysis, false);
                 const [tN, tP, tK] = calcNPK(r.topdressRate, r.topdressAnalysis, false);
