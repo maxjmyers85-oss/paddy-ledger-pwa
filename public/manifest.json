@@ -1,7 +1,7 @@
 {
   "name": "Paddy Ledger",
   "short_name": "Paddy Ledger",
-  "description": "Rice Variety & Harvest Tracker",
+  "description": "Rice Record Tracker",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a0f",
