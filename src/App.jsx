@@ -390,7 +390,7 @@ function PrintModal({ r, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "#fff", color: "#1a1a0a", fontFamily: "Georgia, serif", width: "100%", maxWidth: 680, borderRadius: 4, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      <div style={{ background: "#fff", color: "#1a1a0a", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", width: "100%", maxWidth: 680, borderRadius: 12, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.55)" }}>
 
         {/* Modal toolbar */}
         <div style={{ background: "#3a5a0a", padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -419,7 +419,7 @@ function PrintModal({ r, onClose }) {
             </div>
             <div style={{ fontSize: 11, color: "#9a9a7a", textAlign: "right" }}>
               {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}<br/>
-              Rice Record Tracker
+              Field Record Manager
             </div>
           </div>
 
@@ -437,42 +437,41 @@ function PrintModal({ r, onClose }) {
             <Row label="Harvest / Yield Date" value={formatDate(r.yieldDate)} />
             <Row label="Growth Days" value={days !== null ? `${days} days` : null} />
 {r.yield_lbs > 0 && (() => {
-              const cwt = (r.yield_lbs / 100).toFixed(1);
-              const cwtAc = r.acres > 0 ? (r.yield_lbs / 100 / parseFloat(r.acres)).toFixed(1) : null;
+              const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+              const isTons = rcfg.yieldLabel.includes("tons");
+              const displayVal = isTons ? `${(r.yield_lbs / 2000).toFixed(1)} tons` : `${Number(r.yield_lbs).toLocaleString()} lbs`;
+              const perAc = r.acres > 0 ? (isTons ? `${(r.yield_lbs / 2000 / parseFloat(r.acres)).toFixed(1)} tons/ac` : `${(r.yield_lbs / parseFloat(r.acres)).toFixed(0)} lbs/ac`) : null;
               return (<>
                 <Row label="Acres" value={r.acres > 0 ? `${r.acres} ac` : null} />
-                <Row label="Total Harvest" value={`${Number(r.yield_lbs).toLocaleString()} lbs`} />
-                <Row label="Yield (cwt)" value={`${Number(cwt).toLocaleString()} cwt`} />
-                {cwtAc && <Row label="Yield (cwt/ac)" value={`${cwtAc} cwt/ac`} />}
+                <Row label="Total Harvest" value={displayVal} />
+                {perAc && <Row label="Yield per Acre" value={perAc} />}
               </>);
             })()}
           </Section>
 
-          <Section title="Fertilizer — Aqua">
-            <Row label="Analysis (N-P-K)" value={r.aquaAnalysis} />
-            <Row label="Aqua Rate" value={r.aquaRate ? `${r.aquaRate} gal/ac` : null} />
-            <Row label="Aqua Date" value={r.aquaDate ? formatDate(r.aquaDate) : null} />
-          </Section>
+          {(() => {
+            const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+            return rcfg.fertSections.map((sec, si) => {
+              const filled = sec.fields.filter(f => r[f.field]);
+              if (!filled.length) return null;
+              const secTitle = sec.label.replace(/^▸\s*/, "");
+              return (
+                <Section key={si} title={`Fertilizer — ${secTitle}`}>
+                  {filled.map(f => (
+                    <Row key={f.field} label={f.label}
+                      value={f.type === "date" ? (r[f.field] ? formatDate(r[f.field]) : null) : (r[f.field] || null)} />
+                  ))}
+                </Section>
+              );
+            });
+          })()}
 
-          <Section title="Fertilizer — Starter">
-            <Row label="Product" value={r.starterProduct} />
-            <Row label="Analysis (N-P-K)" value={r.starterAnalysis} />
-            <Row label="Starter Rate" value={r.starterRate ? `${r.starterRate} lbs/ac` : null} />
-            <Row label="Starter Date" value={r.starterDate ? formatDate(r.starterDate) : null} />
-          </Section>
-
-          <Section title="Fertilizer — Topdress">
-            <Row label="Product" value={r.topdressProduct} />
-            <Row label="Analysis (N-P-K)" value={r.topdressAnalysis} />
-            <Row label="Topdress Rate" value={r.topdressRate ? `${r.topdressRate} lbs/ac` : null} />
-            <Row label="Topdress Date" value={r.topdressDate ? formatDate(r.topdressDate) : null} />
-          </Section>
-
-          {(r.aquaRate || r.starterRate || r.topdressRate) && (() => {
-            const [aN, aP, aK] = calcNPK(r.aquaRate, r.aquaAnalysis || "20-0-0", true);
-            const [sN, sP, sK] = calcNPK(r.starterRate, r.starterAnalysis, false);
-            const [tN, tP, tK] = calcNPK(r.topdressRate, r.topdressAnalysis, false);
-            const [totN, totP, totK] = sumNPK([aN,aP,aK],[sN,sP,sK],[tN,tP,tK]);
+          {(() => {
+            const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+            const secNPKs = rcfg.fertSections.map(sec => calcSectionNPK(r, sec)).filter(Boolean);
+            const fNPK = calcFertigationLogNPK(r);
+            const base = secNPKs.reduce((acc, [n,p,k]) => [acc[0]+n,acc[1]+p,acc[2]+k], [0,0,0]);
+            const [totN, totP, totK] = [base[0]+fNPK[0], base[1]+fNPK[1], base[2]+fNPK[2]];
             const fmt = v => v > 0 ? `${v.toFixed(1)} lbs/ac` : "—";
             return (totN > 0 || totP > 0 || totK > 0) ? (
               <Section title="N-P-K Totals (lbs/ac applied)">
@@ -513,7 +512,7 @@ function PrintModal({ r, onClose }) {
 
           {/* Footer */}
           <div style={{ marginTop: 28, borderTop: "1px solid #d0d8b0", paddingTop: 10, fontSize: 10, color: "#aaa", letterSpacing: "0.1em", display: "flex", justifyContent: "space-between" }}>
-            <span>GOLDEN STATE GROWER — Rice Record Tracker</span>
+            <span>GOLDEN STATE GROWER — Field Record Manager</span>
             <span>Field: {r.fieldNumber || "—"} · Variety: {r.variety}</span>
           </div>
         </div>
@@ -627,7 +626,7 @@ function TicketModal({ tickets, setTickets, records, setRecords, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", overflowY: "auto" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "#1a240a", border: "1px solid #3a4a1a", width: "100%", maxWidth: 1000, borderRadius: 4, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ background: "#1a240a", border: "1px solid #3a4a1a", width: "100%", maxWidth: 1000, borderRadius: 12, boxShadow: "0 24px 64px rgba(0,0,0,0.65)" }}>
 
         {/* Header */}
         <div style={{ background: "#243010", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -773,7 +772,7 @@ function VarietyModal({ records, onClose }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"24px 16px",overflowY:"auto" }}
       onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:800,borderRadius:4,boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:800,borderRadius:12,boxShadow:"0 24px 64px rgba(0,0,0,0.65)" }}>
         <div style={{ background:"#243010",padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <span style={{ color:"#c8d86e",fontSize:13,letterSpacing:"0.1em",textTransform:"uppercase" }}>🌾 Variety Summary — Acres & Yield</span>
           <div style={{ display:"flex",gap:8 }}>
@@ -828,7 +827,6 @@ function VarietyModal({ records, onClose }) {
 
 // ── Report Builder Modal ──────────────────────────────────────────────────────
 function ReportBuilderModal({ records, allYears, onClose }) {
-  const allVarieties = [...new Set(records.map(r=>r.variety).filter(Boolean))].sort();
   const allFieldNums = [...new Set(records.map(r=>r.fieldNumber).filter(Boolean))].sort();
   const allCrops = [...new Set(records.map(r=>r.cropType||"rice").filter(Boolean))].sort();
 
@@ -890,6 +888,12 @@ function ReportBuilderModal({ records, allYears, onClose }) {
   const [reportTitle,   setReportTitle]   = React.useState("Custom Field Report");
   const [sortCol,       setSortCol]       = React.useState("fieldNumber");
   const [sortDir,       setSortDir]       = React.useState("asc");
+
+  const allVarieties = React.useMemo(() =>
+    [...new Set(records.filter(r => filterCrop === "all" || (r.cropType||"rice") === filterCrop).map(r=>r.variety).filter(Boolean))].sort(),
+    [records, filterCrop]
+  );
+  React.useEffect(() => { setFilterVariety("all"); }, [filterCrop]);
 
   const toggleCol = col => setSelectedCols(prev => prev.includes(col) ? prev.filter(c=>c!==col) : [...prev, col]);
   const toggleSort = col => { if (sortCol === col) setSortDir(d => d==="asc"?"desc":"asc"); else { setSortCol(col); setSortDir("asc"); } };
@@ -960,7 +964,7 @@ function ReportBuilderModal({ records, allYears, onClose }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 16px",overflowY:"auto" }}
       onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:1100,borderRadius:4,boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:1100,borderRadius:12,boxShadow:"0 24px 64px rgba(0,0,0,0.65)" }}>
 
         {/* Header */}
         <div style={{ background:"#243010",padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
@@ -1130,7 +1134,7 @@ function YoYModal({ records, allYears, onClose }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"24px 16px",overflowY:"auto" }}
       onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{ background:"#1e2a0e",border:"1px solid #3a4a1a",width:"100%",maxWidth:1060,borderRadius:4,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ background:"#1e2a0e",border:"1px solid #3a4a1a",width:"100%",maxWidth:1060,borderRadius:12,overflow:"hidden",boxShadow:"0 24px 64px rgba(0,0,0,0.65)" }}>
 
         <div style={{ background:"#2a4a0a",padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <span style={{ color:"#c8d86e",fontSize:13,letterSpacing:"0.1em",textTransform:"uppercase" }}>📊 Year-over-Year Field Report</span>
@@ -1307,7 +1311,7 @@ export default function App({ user }) {
   const handleDeleteField = (f) => setFields(fields.filter(x => x !== f));
 
   const handleSubmit = async () => {
-    if (!form.variety || !form.plantDate) return;
+    if (!form.variety || (!form.plantDate && !form.plantYear)) return;
     const clean = { ...form, yield_lbs: Number(form.yield_lbs) || 0 };
     if (editId !== null) {
       const updated = { ...clean, id: editId };
@@ -1349,21 +1353,27 @@ export default function App({ user }) {
     });
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #1a1a0f 0%, #2c2c14 50%, #1a1a0f 100%)", fontFamily: "'Georgia', 'Times New Roman', serif", color: "#e8e0c8" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #1a1a0f 0%, #2c2c14 50%, #1a1a0f 100%)", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", color: "#e8e0c8" }}>
       <style>{`
         @keyframes slideDown { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:translateY(0) } }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
         input[type="number"] { -moz-appearance: textfield; }
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
-        select option, select optgroup { background: #ffffff; color: #1a1a0a; }
+        select option, select optgroup { background: #1e2a0a; color: #e8e0c8; }
         select { color: #e8e0c8; }
-        * { -webkit-tap-highlight-color: transparent; }
-        input, select, textarea { font-size: 16px !important; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        input, select, textarea { font-size: 15px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important; border-radius: 7px !important; }
+        button { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important; border-radius: 7px !important; }
+        label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important; }
+        .brand-name { font-family: 'Georgia', 'Times New Roman', serif !important; }
         .rpad { padding-left: clamp(16px,4vw,48px); padding-right: clamp(16px,4vw,48px); }
         .hdr-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .sort-row { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-bottom: 2px; flex-shrink: 0; }
         .sort-row::-webkit-scrollbar { display: none; }
-        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px,100%), 1fr)); gap: 16px; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px,100%), 1fr)); gap: 20px; }
+        .crop-card { transition: background 0.2s, transform 0.15s, box-shadow 0.15s; }
+        .crop-card:hover { background: rgba(255,255,255,0.07) !important; transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+        .modal-panel { border-radius: 12px !important; }
         @media (max-width: 640px) {
           .btn-lbl { display: none; }
           .hdr-btn { padding: 10px 11px !important; }
@@ -1380,9 +1390,9 @@ export default function App({ user }) {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
             <span style={{ fontSize: 36, lineHeight: 1 }}>🌾</span>
-            <h1 style={{ margin: 0, fontSize: "clamp(22px, 4vw, 38px)", fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e", textShadow: "0 2px 12px rgba(160,180,60,0.3)" }}>GOLDEN STATE GROWER</h1>
+            <h1 className="brand-name" style={{ margin: 0, fontSize: "clamp(22px, 4vw, 38px)", fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e", textShadow: "0 2px 12px rgba(160,180,60,0.3)" }}>GOLDEN STATE GROWER</h1>
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#8a9e5a", letterSpacing: "0.15em", textTransform: "uppercase" }}>Rice Record Tracker</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#8a9e5a", letterSpacing: "0.18em", textTransform: "uppercase" }}>Field Record Manager</p>
         </div>
         <div className="hdr-btns">
           <button onClick={() => setShowFieldMgr(!showFieldMgr)} className="hdr-btn"
@@ -1447,7 +1457,7 @@ export default function App({ user }) {
       {showForm && (
         <div className="rpad" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid #3a4a1a", paddingTop: 28, paddingBottom: 28, animation: "slideDown 0.2s ease" }}>
           <h3 style={{ margin: "0 0 24px", fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8a9e5a" }}>
-            {editId !== null ? "✎ Edit Record" : "+ New Rice Record"}
+            {editId !== null ? "✎ Edit Record" : "+ New Record"}
           </h3>
 
           {/* Crop Type */}
@@ -1702,7 +1712,7 @@ export default function App({ user }) {
         {filtered.length === 0 && (
           <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 0", color: "#5a6e2a" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🌱</div>
-            <p style={{ fontSize: 14, letterSpacing: "0.1em" }}>No records yet. Add your first rice variety.</p>
+            <p style={{ fontSize: 14, letterSpacing: "0.1em" }}>No records yet — tap + New to add your first field record.</p>
           </div>
         )}
         {filtered.map(r => {
@@ -1711,9 +1721,7 @@ export default function App({ user }) {
           const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
           const hasFert = rcfg.fertSections.some(sec => sec.fields.some(f => r[f.field]));
           return (
-            <div key={r.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #2a3a0a", borderLeft: `4px solid ${sc}`, borderRadius: 3, padding: "20px 22px", transition: "background 0.2s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}>
+            <div key={r.id} className="crop-card" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #2d3f10", borderLeft: `4px solid ${sc}`, borderRadius: 10, padding: "20px 22px" }}>
 
               {/* Card Header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>

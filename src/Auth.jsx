@@ -13,7 +13,7 @@ export default function Auth() {
     width: "100%", boxSizing: "border-box",
     background: "rgba(255,255,255,0.07)", border: "1px solid #3a4a1a",
     color: "#e8e0c8", padding: "11px 14px", fontSize: 15,
-    fontFamily: "Georgia, serif", borderRadius: 2, outline: "none",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", borderRadius: 8, outline: "none",
   };
 
   async function handleSubmit(e) {
@@ -45,7 +45,7 @@ export default function Auth() {
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{ fontSize: 48, marginBottom: 10 }}>🌾</div>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e" }}>GOLDEN STATE GROWER</h1>
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#7a8e4a", letterSpacing: "0.2em", textTransform: "uppercase" }}>Rice Record Tracker</p>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#7a8e4a", letterSpacing: "0.2em", textTransform: "uppercase" }}>Field Record Manager</p>
         </div>
 
         {/* Card */}

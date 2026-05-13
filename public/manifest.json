@@ -1,7 +1,7 @@
 {
   "name": "Golden State Grower",
   "short_name": "Golden State Grower",
-  "description": "Rice Record Tracker",
+  "description": "Field Record Manager",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a0f",
