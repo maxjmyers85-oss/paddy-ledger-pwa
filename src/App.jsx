@@ -1,10 +1,65 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
 
+const CROP_CONFIGS = {
+  rice: {
+    label: "Rice", icon: "🌾",
+    varietyGroups: [
+      { label: "CA Medium Grain", items: ["M-105","M-202","M-204","M-205","M-206","M-207","M-208","M-209","M-210","M-211"] },
+      { label: "CA Short Grain", items: ["S-102","S-201"] },
+      { label: "CA Long Grain", items: ["L-204","L-205","L-206"] },
+      { label: "Other", items: ["Jasmine","Basmati","Arborio","Glutinous","Brown Rice","Wild Rice","Other"] },
+    ],
+    yieldLabel: "Total Harvest (lbs)", showAqua: true,
+    extraFields: [],
+  },
+  tomatoes: {
+    label: "Processing Tomatoes", icon: "🍅",
+    varieties: ["Heinz 2401","Heinz 3402","AB2","Halley 3155","Escalon","Peto 696","Other"],
+    yieldLabel: "Total Harvest (tons)", showAqua: false,
+    extraFields: [
+      { label: "Brix", field: "brix", type: "number" },
+      { label: "Processor / Contract", field: "processor", type: "text" },
+    ],
+  },
+  wheat: {
+    label: "Wheat", icon: "🌿",
+    varieties: ["WB4458","WB4303","Yecora Rojo","Patwin","UC Drought Tolerant","Other"],
+    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    extraFields: [
+      { label: "Seeding Rate (lbs/ac)", field: "seedingRate", type: "number" },
+      { label: "Protein %", field: "protein", type: "number" },
+      { label: "Test Weight (lbs/bu)", field: "testWeight", type: "number" },
+    ],
+  },
+  corn: {
+    label: "Corn", icon: "🌽",
+    varieties: ["DeKalb DKC","Pioneer P","NK Brand","Syngenta","Other"],
+    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    extraFields: [
+      { label: "Population (seeds/ac)", field: "population", type: "number" },
+    ],
+  },
+  almonds: {
+    label: "Almonds", icon: "🌰",
+    varieties: ["Nonpareil","Carmel","Butte","Padre","Wood Colony","Independence","Shasta","Other"],
+    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    extraFields: [
+      { label: "Bloom Date", field: "bloomDate", type: "date" },
+      { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
+    ],
+  },
+  sunflowers: {
+    label: "Sunflowers", icon: "🌻",
+    varieties: ["Croplan","Dekalb","Pioneer","Triumph","Other"],
+    yieldLabel: "Total Harvest (lbs)", showAqua: false,
+    extraFields: [],
+  },
+};
+
 const VARIETIES = [
   "M-105", "M-202", "M-204", "M-205", "M-206", "M-207", "M-208", "M-209", "M-210", "M-211",
-  "S-102", "S-201",
-  "L-204", "L-205", "L-206",
+  "S-102", "S-201", "L-204", "L-205", "L-206",
   "Jasmine", "Basmati", "Arborio", "Glutinous", "Brown Rice", "Wild Rice", "Other"
 ];
 
@@ -23,12 +78,15 @@ const statusColor = (days) => {
 };
 
 const emptyForm = {
+  cropType: "rice",
   fieldNumber: "", variety: "", plantDate: "", yieldDate: "", acres: "", yield_lbs: "", notes: "",
   aquaAnalysis: "20-0-0", aquaRate: "", aquaDate: "",
   starterProduct: "", starterAnalysis: "", starterRate: "", starterDate: "",
   topdressProduct: "", topdressAnalysis: "", topdressRate: "", topdressDate: "",
   herbicideName: "", herbicideRate: "", herbicideUnit: "gal", herbicideDate: "",
   herb2Name: "", herb2Rate: "", herb2Unit: "gal", herb2Date: "",
+  brix: "", processor: "", seedingRate: "", protein: "", testWeight: "",
+  population: "", bloomDate: "", hullSplitDate: "",
 };
 
 // ── NPK calculation helper ───────────────────────────────────────────────────
@@ -875,6 +933,7 @@ export default function App({ user }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("fieldNumber");
   const [yearFilter, setYearFilter] = useState("all");
+  const [cropFilter, setCropFilter] = useState("all");
   const [printRecord, setPrintRecord] = useState(null);
   const [showYoY, setShowYoY] = useState(false);
   const [showVariety, setShowVariety] = useState(false);
@@ -922,6 +981,7 @@ export default function App({ user }) {
   const filtered = records
     .filter(r => [r.variety, r.notes, r.fieldNumber].join(" ").toLowerCase().includes(search.toLowerCase()))
     .filter(r => yearFilter === "all" || (r.plantDate && new Date(r.plantDate).getFullYear() === parseInt(yearFilter)))
+    .filter(r => cropFilter === "all" || (r.cropType || "rice") === cropFilter)
     .sort((a, b) => {
       if (sort === "year") {
         const ya = a.plantDate ? new Date(a.plantDate).getFullYear() : 0;
@@ -1033,63 +1093,89 @@ export default function App({ user }) {
             {editId !== null ? "✎ Edit Record" : "+ New Rice Record"}
           </h3>
 
-          <SectionHeader color="#5a7a2a" label="▸ Crop Info" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
-            {[
-              { label: "Field Number", field: "fieldNumber", type: "fieldselect" },
-              { label: "Variety *", field: "variety", type: "select" },
-              { label: "Plant Date *", field: "plantDate", type: "date" },
-              { label: "Yield / Harvest Date", field: "yieldDate", type: "date" },
-              { label: "Acres", field: "acres", type: "number" },
-              { label: "Total Harvest (lbs)", field: "yield_lbs", type: "number" },
-              { label: "Notes", field: "notes", type: "text" },
-            ].map(({ label, field, type }) => (
-              <div key={field}>
-                <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>{label}</label>
-                {type === "fieldselect" ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {fields.length > 0 ? (
-                      <select value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })}
-                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #3a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none",flex:1 }}>
-                        <option value="">Select field…</option>
-                        {fields.map(f => <option key={f} value={f}>{f}</option>)}
-                      </select>
-                    ) : (
-                      <input type="text" value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })}
-                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #3a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none",flex:1 }} placeholder="e.g. F-01" />
-                    )}
-                  </div>
-                ) : type === "select" ? (
-                  <select value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} style={inputStyle}>
-                    <option value="">Select variety…</option>
-                    <optgroup label="CA Medium Grain">
-                      {["M-105","M-202","M-204","M-205","M-206","M-207","M-208","M-209","M-210","M-211"].map(v => <option key={v} value={v}>{v}</option>)}
-                    </optgroup>
-                    <optgroup label="CA Short Grain">
-                      {["S-102","S-201"].map(v => <option key={v} value={v}>{v}</option>)}
-                    </optgroup>
-                    <optgroup label="CA Long Grain">
-                      {["L-204","L-205","L-206"].map(v => <option key={v} value={v}>{v}</option>)}
-                    </optgroup>
-                    <optgroup label="Other">
-                      {["Jasmine","Basmati","Arborio","Glutinous","Brown Rice","Wild Rice","Other"].map(v => <option key={v} value={v}>{v}</option>)}
-                    </optgroup>
-                  </select>
-                ) : (
-                  <input type={type} value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })}
-                    style={inputStyle} placeholder={field === "notes" ? "Optional notes…" : field === "fieldNumber" ? "e.g. F-01" : ""} />
-                )}
-              </div>
-            ))}
+          {/* Crop Type */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>Crop Type</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {Object.entries(CROP_CONFIGS).map(([key, cfg]) => (
+                <button key={key} type="button"
+                  onClick={() => setForm({ ...emptyForm, cropType: key, fieldNumber: form.fieldNumber, acres: form.acres, plantDate: form.plantDate, notes: form.notes })}
+                  style={{ background: form.cropType === key ? "#3a6a1a" : "rgba(255,255,255,0.05)", border: `1px solid ${form.cropType === key ? "#5a9a2a" : "#3a4a1a"}`, color: form.cropType === key ? "#c8d86e" : "#7a8e4a", padding: "8px 16px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", borderRadius: 2, transition: "all 0.15s" }}>
+                  {cfg.icon} {cfg.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <SectionHeader color="#4a8a7a" label="▸ Fertilizer — Aqua" />
-          <FertBox borderColor="#2a6a5a" bg="rgba(60,120,100,0.07)" labelColor="#5a9e8a"
-            fields={[
-              { label: "Analysis (N-P-K)", field: "aquaAnalysis", type: "text" },
-              { label: "Aqua Rate (gal/ac)", field: "aquaRate", type: "number" },
-              { label: "Aqua Date", field: "aquaDate", type: "date" },
-            ]} form={form} setForm={setForm} />
+          <SectionHeader color="#5a7a2a" label="▸ Crop Info" />
+          {(() => {
+            const cfg = CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice;
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
+                {/* Field Number */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>Field Number</label>
+                  {fields.length > 0 ? (
+                    <select value={form.fieldNumber} onChange={e => setForm({ ...form, fieldNumber: e.target.value })}
+                      style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #3a4a1a",color:"#e8e0c8",padding:"9px 12px",fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }}>
+                      <option value="">Select field…</option>
+                      {fields.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={form.fieldNumber} onChange={e => setForm({ ...form, fieldNumber: e.target.value })}
+                      style={inputStyle} placeholder="e.g. F-01" />
+                  )}
+                </div>
+                {/* Variety */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>Variety *</label>
+                  <select value={form.variety} onChange={e => setForm({ ...form, variety: e.target.value })} style={inputStyle}>
+                    <option value="">Select variety…</option>
+                    {cfg.varietyGroups
+                      ? cfg.varietyGroups.map(g => (
+                          <optgroup key={g.label} label={g.label}>
+                            {g.items.map(v => <option key={v} value={v}>{v}</option>)}
+                          </optgroup>
+                        ))
+                      : cfg.varieties.map(v => <option key={v} value={v}>{v}</option>)
+                    }
+                  </select>
+                </div>
+                {/* Common date/number fields */}
+                {[
+                  { label: "Plant Date *", field: "plantDate", type: "date" },
+                  { label: "Yield / Harvest Date", field: "yieldDate", type: "date" },
+                  { label: "Acres", field: "acres", type: "number" },
+                  { label: cfg.yieldLabel, field: "yield_lbs", type: "number" },
+                  { label: "Notes", field: "notes", type: "text" },
+                ].map(({ label, field, type }) => (
+                  <div key={field}>
+                    <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>{label}</label>
+                    <input type={type} value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })}
+                      style={inputStyle} placeholder={field === "notes" ? "Optional notes…" : ""} />
+                  </div>
+                ))}
+                {/* Crop-specific extra fields */}
+                {cfg.extraFields.map(({ label, field, type }) => (
+                  <div key={field}>
+                    <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#7a8e4a", marginBottom: 6 }}>{label}</label>
+                    <input type={type} value={form[field] || ""} onChange={e => setForm({ ...form, [field]: e.target.value })}
+                      style={inputStyle} />
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {(CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice).showAqua && <>
+            <SectionHeader color="#4a8a7a" label="▸ Fertilizer — Aqua" />
+            <FertBox borderColor="#2a6a5a" bg="rgba(60,120,100,0.07)" labelColor="#5a9e8a"
+              fields={[
+                { label: "Analysis (N-P-K)", field: "aquaAnalysis", type: "text" },
+                { label: "Aqua Rate (gal/ac)", field: "aquaRate", type: "number" },
+                { label: "Aqua Date", field: "aquaDate", type: "date" },
+              ]} form={form} setForm={setForm} />
+          </>}
 
           <SectionHeader color="#8a7a3a" label="▸ Fertilizer — Starter" />
           <FertBox borderColor="#6a5a1a" bg="rgba(120,100,40,0.07)" labelColor="#9a8e4a"
@@ -1164,6 +1250,13 @@ export default function App({ user }) {
           {[["fieldNumber", "Field #"], ["plantDate", "Planted"], ["yieldDate", "Harvest"], ["variety", "Variety"], ["year", "Year"]].map(([s, label]) => (
             <button key={s} onClick={() => setSort(s)} style={{ background: sort === s ? "#5a7a1a" : "transparent", border: "1px solid #3a4a1a", color: sort === s ? "#c8d86e" : "#8a9e5a", padding: "6px 12px", fontSize: 11, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2, transition: "all 0.15s", flexShrink: 0 }}>{label}</button>
           ))}
+          <select value={cropFilter} onChange={e => setCropFilter(e.target.value)}
+            style={{ background: "#2a3a0a", border: "1px solid #3a4a1a", color: "#c8d86e", padding: "6px 10px", fontFamily: "Georgia, serif", borderRadius: 2, outline: "none", cursor: "pointer", flexShrink: 0 }}>
+            <option value="all">All Crops</option>
+            {Object.entries(CROP_CONFIGS).map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.icon} {cfg.label}</option>
+            ))}
+          </select>
           {allYears.length > 0 && (
             <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
               style={{ background: "#2a3a0a", border: "1px solid #3a4a1a", color: "#c8d86e", padding: "6px 10px", fontFamily: "Georgia, serif", borderRadius: 2, outline: "none", cursor: "pointer", flexShrink: 0 }}>
@@ -1201,6 +1294,11 @@ export default function App({ user }) {
                     {r.fieldNumber && (
                       <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", color: "#aac8e8", padding: "2px 8px", borderRadius: 2 }}>#{r.fieldNumber}</span>
                     )}
+                    {r.cropType && r.cropType !== "rice" && (
+                      <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", background: "rgba(255,255,255,0.07)", color: "#b0b880", padding: "2px 8px", borderRadius: 2 }}>
+                        {(CROP_CONFIGS[r.cropType] || {}).icon} {(CROP_CONFIGS[r.cropType] || {}).label}
+                      </span>
+                    )}
                     <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", background: "rgba(120,160,40,0.15)", color: "#c8d86e", padding: "2px 8px", borderRadius: 2 }}>{r.variety}</span>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#e8e0c8" }}>
@@ -1230,6 +1328,23 @@ export default function App({ user }) {
                 })()}
                 {days !== null && <StatBlock label="Growth Days" value={`${days}d`} icon="📅" valueColor={sc} />}
               </div>
+
+              {/* Crop-specific extra stats */}
+              {(() => {
+                const cfg = CROP_CONFIGS[r.cropType];
+                if (!cfg || !cfg.extraFields.length) return null;
+                const extras = cfg.extraFields.filter(f => r[f.field]);
+                if (!extras.length) return null;
+                return (
+                  <CardSection label={`${cfg.icon} ${cfg.label} Details`} color="#6a7a4a">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {extras.map(f => (
+                        <StatBlock key={f.field} label={f.label} value={f.type === "date" ? formatDate(r[f.field]) : r[f.field]} icon={cfg.icon} valueColor="#c8d86e" />
+                      ))}
+                    </div>
+                  </CardSection>
+                );
+              })()}
 
               {/* Fertilizer */}
               {hasFert && (
