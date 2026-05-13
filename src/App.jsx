@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "./supabase";
 
 const VARIETIES = [
   "M-105", "M-202", "M-204", "M-205", "M-206", "M-207", "M-208", "M-209", "M-210", "M-211",
@@ -836,7 +837,7 @@ const unitToggleStyle = {
 };
 
 // ── Main App ─────────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ user }) {
   const [records, setRecords] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [fields, setFields] = useState([]);
@@ -845,33 +846,28 @@ export default function App() {
   const [tickets, setTickets] = useState([]);
   const [showTickets, setShowTickets] = useState(false);
 
-  // Load from localStorage on startup
+  // Load data from Supabase on startup
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("paddy-ledger-data");
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved && saved.length > 0) {
-          if (saved[0] && saved[0].__fields) {
-            setFields(saved[0].__fields);
-            if (saved[0].__tickets) setTickets(saved[0].__tickets);
-            setRecords(saved.slice(1));
-          } else {
-            setRecords(saved);
-          }
-        }
+    async function load() {
+      const [{ data: recs }, { data: ud }] = await Promise.all([
+        supabase.from("records").select("data").eq("user_id", user.id),
+        supabase.from("user_data").select("fields, tickets").eq("user_id", user.id).maybeSingle(),
+      ]);
+      if (recs) setRecords(recs.map(r => r.data));
+      if (ud) {
+        if (ud.fields) setFields(ud.fields);
+        if (ud.tickets) setTickets(ud.tickets);
       }
-    } catch(e) { console.error("Load error:", e); }
-    setLoaded(true);
-  }, []);
+      setLoaded(true);
+    }
+    load();
+  }, [user.id]);
 
-  // Auto-save whenever records, fields, or tickets change
+  // Sync fields + tickets to Supabase whenever they change
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem("paddy-ledger-data", JSON.stringify([{ __fields: fields, __tickets: tickets }, ...records]));
-    } catch(e) { console.error("Save error:", e); }
-  }, [records, fields, tickets, loaded]);
+    supabase.from("user_data").upsert({ user_id: user.id, fields, tickets, updated_at: new Date().toISOString() });
+  }, [fields, tickets, loaded, user.id]);
 
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -894,21 +890,29 @@ export default function App() {
 
   const handleDeleteField = (f) => setFields(fields.filter(x => x !== f));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.variety || !form.plantDate) return;
     const clean = { ...form, yield_lbs: Number(form.yield_lbs) || 0 };
     if (editId !== null) {
-      setRecords(records.map(r => r.id === editId ? { ...clean, id: editId } : r));
+      const updated = { ...clean, id: editId };
+      setRecords(records.map(r => r.id === editId ? updated : r));
+      supabase.from("records").upsert({ id: editId, user_id: user.id, data: updated });
       setEditId(null);
     } else {
-      setRecords([...records, { ...clean, id: Date.now() }]);
+      const id = crypto.randomUUID();
+      const newRec = { ...clean, id };
+      setRecords([...records, newRec]);
+      supabase.from("records").insert({ id, user_id: user.id, data: newRec });
     }
     setForm(emptyForm);
     setShowForm(false);
   };
 
   const handleEdit = (r) => { setForm({ ...emptyForm, ...r }); setEditId(r.id); setShowForm(true); };
-  const handleDelete = (id) => setRecords(records.filter(r => r.id !== id));
+  const handleDelete = (id) => {
+    setRecords(records.filter(r => r.id !== id));
+    supabase.from("records").delete().eq("id", id).eq("user_id", user.id);
+  };
 
   const allYears = [...new Set(records
     .map(r => r.plantDate ? new Date(r.plantDate).getFullYear() : null)
@@ -971,6 +975,11 @@ export default function App() {
           <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }}
             style={{ background: showForm ? "#3a3a1a" : "#7a9a2a", border: "none", color: "#e8e0c8", padding: "10px 24px", fontSize: 14, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.2s", borderRadius: 2, boxShadow: "0 4px 16px rgba(120,160,40,0.3)" }}>
             {showForm ? "✕ Cancel" : "+ New Entry"}
+          </button>
+          <button onClick={() => supabase.auth.signOut()}
+            style={{ background: "transparent", border: "1px solid #3a3a1a", color: "#5a6a3a", padding: "10px 16px", fontSize: 12, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}
+            title={user.email}>
+            Sign Out
           </button>
         </div>
       </div>
