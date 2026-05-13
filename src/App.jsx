@@ -173,7 +173,13 @@ const CROP_CONFIGS = {
   },
   tomatoes: {
     label: "Processing Tomatoes", icon: "🍅",
-    varieties: ["Heinz 2401","Heinz 3402","AB2","Halley 3155","Escalon","Peto 696","Other"],
+    varieties: [
+      "Heinz 2401","Heinz 3402","HMX 7883","HMX 7884","AB-2","AB-2 Improved",
+      "Halley 3155","Halley 3254","Escalon","Escalade","Peto 696",
+      "BHN 444","BHN 602","BHN 836","BHN 968",
+      "Zenith","Brigade","Rugged","Revenge","Tempest","Momentum",
+      "CalRed","Hypeel 45","Imperial","Blazer","Other"
+    ],
     yieldLabel: "Total Harvest (tons)",
     extraFields: [
       { label: "Brix", field: "brix", type: "number" },
@@ -208,10 +214,8 @@ const CROP_CONFIGS = {
     label: "Almonds", icon: "🌰",
     varieties: ["Nonpareil","Carmel","Butte","Padre","Wood Colony","Independence","Shasta","Other"],
     yieldLabel: "Total Harvest (lbs)",
-    extraFields: [
-      { label: "Bloom Date", field: "bloomDate", type: "date" },
-      { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
-    ],
+    isPerennial: true,
+    extraFields: [],
     fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
     showNPK: false,
   },
@@ -227,9 +231,30 @@ const CROP_CONFIGS = {
     label: "Walnuts", icon: "🌳",
     varieties: ["Chandler","Hartley","Howard","Tulare","Vina","Franquette","Serr","Chico","Other"],
     yieldLabel: "Total Harvest (lbs)",
+    isPerennial: true,
     extraFields: [
       { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
     ],
+    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    showNPK: false,
+  },
+  pistachios: {
+    label: "Pistachios", icon: "🫘",
+    varieties: ["Kerman","Golden Hills","Lost Hills","Platinum","Randy","Peters","Gumdrop","Other"],
+    yieldLabel: "Total Harvest (lbs)",
+    isPerennial: true,
+    extraFields: [
+      { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
+    ],
+    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    showNPK: false,
+  },
+  pecans: {
+    label: "Pecans", icon: "🥜",
+    varieties: ["Wichita","Western","Desirable","Cheyenne","Sioux","Kiowa","Stuart","Pawnee","Other"],
+    yieldLabel: "Total Harvest (lbs)",
+    isPerennial: true,
+    extraFields: [],
     fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
     showNPK: false,
   },
@@ -257,7 +282,7 @@ const statusColor = (days) => {
 
 const emptyForm = {
   cropType: "rice",
-  fieldNumber: "", variety: "", plantDate: "", yieldDate: "", acres: "", yield_lbs: "", notes: "",
+  fieldNumber: "", variety: "", plantDate: "", plantYear: "", yieldDate: "", acres: "", yield_lbs: "", notes: "",
   // rice
   aquaAnalysis: "20-0-0", aquaRate: "", aquaDate: "",
   starterProduct: "", starterAnalysis: "", starterRate: "", starterDate: "",
@@ -268,18 +293,17 @@ const emptyForm = {
   fert2Product: "", fert2Analysis: "", fert2Rate: "", fert2Date: "",
   fert3Product: "", fert3Analysis: "", fert3Rate: "", fert3Date: "",
   sidedressProduct: "", sidedressAnalysis: "", sidedressRate: "", sidedressDate: "",
-  // almonds
+  // perennials
   dormantProduct: "", dormantAnalysis: "", dormantRate: "", dormantDate: "",
   springProduct: "", springAnalysis: "", springRate: "", springDate: "",
   fertigationProduct: "", fertigationAnalysis: "", fertigationRate: "", fertigationApps: "", fertigationDate: "", fertigationLbsPerGal: "",
   fert1LbsPerGal: "", fert2LbsPerGal: "", fert3LbsPerGal: "",
   foliarProduct: "", foliarRate: "", foliarDate: "",
-  // herbicides
-  herbicideName: "", herbicideRate: "", herbicideUnit: "gal", herbicideDate: "",
-  herb2Name: "", herb2Rate: "", herb2Unit: "gal", herb2Date: "",
   // crop-specific extras
   brix: "", processor: "", seedingRate: "", protein: "", testWeight: "",
-  population: "", bloomDate: "", hullSplitDate: "",
+  population: "", hullSplitDate: "",
+  // spray log
+  sprayLog: [],
 };
 
 // ── NPK calculation helper ───────────────────────────────────────────────────
@@ -396,7 +420,7 @@ function PrintModal({ r, onClose }) {
           {r.notes && <div style={{ background: "#f5f8ec", borderLeft: "3px solid #8aaa3a", padding: "10px 14px", fontSize: 13, color: "#3a4a1a", marginBottom: 18, fontStyle: "italic" }}>{r.notes}</div>}
 
           <Section title="Crop Info">
-            <Row label="Plant Date" value={formatDate(r.plantDate)} />
+            {r.plantYear ? <Row label="Plant Year" value={r.plantYear} /> : <Row label="Plant Date" value={formatDate(r.plantDate)} />}
             <Row label="Harvest / Yield Date" value={formatDate(r.yieldDate)} />
             <Row label="Growth Days" value={days !== null ? `${days} days` : null} />
 {r.yield_lbs > 0 && (() => {
@@ -446,17 +470,18 @@ function PrintModal({ r, onClose }) {
             ) : null;
           })()}
 
-          <Section title="First Herbicide">
-            <Row label="Product" value={r.herbicideName} />
-            <Row label="Rate" value={r.herbicideRate ? `${r.herbicideRate} ${r.herbicideUnit || "gal"}/ac` : null} />
-            <Row label="Date" value={r.herbicideDate ? formatDate(r.herbicideDate) : null} />
-          </Section>
-
-          <Section title="Second Herbicide">
-            <Row label="Product" value={r.herb2Name} />
-            <Row label="Rate" value={r.herb2Rate ? `${r.herb2Rate} ${r.herb2Unit || "gal"}/ac` : null} />
-            <Row label="Date" value={r.herb2Date ? formatDate(r.herb2Date) : null} />
-          </Section>
+          {(r.sprayLog || []).length > 0 && (
+            <Section title="Spray Log">
+              {(r.sprayLog || []).map((entry, idx) => (
+                <React.Fragment key={idx}>
+                  <Row label={`#${idx+1} Type`} value={entry.type} />
+                  <Row label={`#${idx+1} Product`} value={entry.product} />
+                  <Row label={`#${idx+1} Rate`} value={entry.rate ? `${entry.rate} ${entry.unit||"gal"}/ac` : null} />
+                  <Row label={`#${idx+1} Date`} value={entry.date ? formatDate(entry.date) : null} />
+                </React.Fragment>
+              ))}
+            </Section>
+          )}
 
           {/* Footer */}
           <div style={{ marginTop: 28, borderTop: "1px solid #d0d8b0", paddingTop: 10, fontSize: 10, color: "#aaa", letterSpacing: "0.1em", display: "flex", justifyContent: "space-between" }}>
@@ -1355,7 +1380,9 @@ export default function App({ user }) {
                 </div>
                 {/* Common date/number fields */}
                 {[
-                  { label: "Plant Date *", field: "plantDate", type: "date" },
+                  cfg.isPerennial
+                    ? { label: "Plant Year", field: "plantYear", type: "number" }
+                    : { label: "Plant Date *", field: "plantDate", type: "date" },
                   { label: "Yield / Harvest Date", field: "yieldDate", type: "date" },
                   { label: "Acres", field: "acres", type: "number" },
                   { label: cfg.yieldLabel, field: "yield_lbs", type: "number" },
@@ -1418,44 +1445,50 @@ export default function App({ user }) {
             );
           })()}
 
-          <SectionHeader color="#8a4a3a" label="▸ First Herbicide" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24, padding: "16px", background: "rgba(140,60,40,0.07)", borderLeft: "3px solid #6a2a1a", borderRadius: 2 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#bc7a6a", marginBottom: 6 }}>Herbicide Name</label>
-              <input type="text" value={form.herbicideName} onChange={e => setForm({ ...form, herbicideName: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a2a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#bc7a6a", marginBottom: 6 }}>Rate</label>
-              <div style={{ display: "flex", gap: 6 }}>
-                <input type="number" value={form.herbicideRate} onChange={e => setForm({ ...form, herbicideRate: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a2a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none",flex:1 }} />
-                <button type="button" onClick={() => setForm({ ...form, herbicideUnit: form.herbicideUnit === "gal" ? "lbs" : "gal" })}
-                  style={unitToggleStyle}>{form.herbicideUnit}/ac</button>
-              </div>
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#bc7a6a", marginBottom: 6 }}>Herbicide Date</label>
-              <input type="date" value={form.herbicideDate} onChange={e => setForm({ ...form, herbicideDate: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a2a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
-            </div>
-          </div>
-
-          <SectionHeader color="#6a3a5a" label="▸ Second Herbicide" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24, padding: "16px", background: "rgba(100,40,80,0.07)", borderLeft: "3px solid #4a1a3a", borderRadius: 2 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#a86a8e", marginBottom: 6 }}>Herbicide Name</label>
-              <input type="text" value={form.herb2Name} onChange={e => setForm({ ...form, herb2Name: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #4a1a3a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#a86a8e", marginBottom: 6 }}>Rate</label>
-              <div style={{ display: "flex", gap: 6 }}>
-                <input type="number" value={form.herb2Rate} onChange={e => setForm({ ...form, herb2Rate: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #4a1a3a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none",flex:1 }} />
-                <button type="button" onClick={() => setForm({ ...form, herb2Unit: form.herb2Unit === "gal" ? "lbs" : "gal" })}
-                  style={unitToggleStyle}>{form.herb2Unit}/ac</button>
-              </div>
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#a86a8e", marginBottom: 6 }}>Herbicide Date</label>
-              <input type="date" value={form.herb2Date} onChange={e => setForm({ ...form, herb2Date: e.target.value })} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #4a1a3a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
-            </div>
+          <SectionHeader color="#7a5a2a" label="▸ Spray Log" />
+          <div style={{ marginBottom: 24 }}>
+            {(form.sprayLog || []).map((entry, idx) => {
+              const UNITS = ["gal","qt","pt","fl oz","lbs","oz"];
+              const nextUnit = u => UNITS[(UNITS.indexOf(u) + 1) % UNITS.length];
+              const update = (field, val) => setForm({ ...form, sprayLog: form.sprayLog.map((e, i) => i === idx ? { ...e, [field]: val } : e) });
+              return (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 10, padding: "14px", background: "rgba(120,90,40,0.08)", borderLeft: "3px solid #6a4a1a", borderRadius: 2, position: "relative" }}>
+                  <div>
+                    <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#a8844a",marginBottom:6 }}>Type</label>
+                    <select value={entry.type} onChange={e => update("type", e.target.value)}
+                      style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a4a1a",color:"#e8e0c8",padding:"9px 12px",fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }}>
+                      {["Herbicide","Fungicide","Insecticide","Adjuvant","PGR","Other"].map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#a8844a",marginBottom:6 }}>Product</label>
+                    <input type="text" value={entry.product} onChange={e => update("product", e.target.value)}
+                      style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                  </div>
+                  <div>
+                    <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#a8844a",marginBottom:6 }}>Rate</label>
+                    <div style={{ display:"flex",gap:6 }}>
+                      <input type="number" value={entry.rate} onChange={e => update("rate", e.target.value)}
+                        style={{ flex:1,boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                      <button type="button" onClick={() => update("unit", nextUnit(entry.unit))}
+                        style={{ ...unitToggleStyle, borderColor:"#6a4a1a",background:"#3a2a0a" }}>{entry.unit}/ac</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#a8844a",marginBottom:6 }}>Date</label>
+                    <input type="date" value={entry.date} onChange={e => update("date", e.target.value)}
+                      style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #6a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                  </div>
+                  <button type="button" onClick={() => setForm({ ...form, sprayLog: form.sprayLog.filter((_,i) => i !== idx) })}
+                    style={{ alignSelf:"flex-end",background:"#5a2a0a",border:"none",color:"#e8b090",padding:"9px 14px",fontSize:13,fontFamily:"inherit",cursor:"pointer",borderRadius:2 }}>✕ Remove</button>
+                </div>
+              );
+            })}
+            <button type="button"
+              onClick={() => setForm({ ...form, sprayLog: [...(form.sprayLog||[]), { type:"Herbicide", product:"", rate:"", unit:"gal", date:"" }] })}
+              style={{ background:"rgba(120,90,40,0.15)",border:"1px dashed #6a4a1a",color:"#a8844a",padding:"9px 20px",fontSize:12,fontFamily:"inherit",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase",borderRadius:2 }}>
+              + Add Application
+            </button>
           </div>
 
           <button onClick={handleSubmit} className="save-full" style={{ background: "#7a9a2a", border: "none", color: "#fff", padding: "10px 32px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2, boxShadow: "0 2px 12px rgba(100,140,20,0.4)" }}>
@@ -1504,8 +1537,6 @@ export default function App({ user }) {
           const sc = statusColor(days);
           const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
           const hasFert = rcfg.fertSections.some(sec => sec.fields.some(f => r[f.field]));
-          const hasHerb = r.herbicideName || r.herbicideRate || r.herbicideDate;
-          const hasHerb2 = r.herb2Name || r.herb2Rate || r.herb2Date;
           return (
             <div key={r.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #2a3a0a", borderLeft: `4px solid ${sc}`, borderRadius: 3, padding: "20px 22px", transition: "background 0.2s" }}
               onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
@@ -1539,7 +1570,9 @@ export default function App({ user }) {
 
               {/* Crop Stats */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <StatBlock label="Planted" value={formatDate(r.plantDate)} icon="🌱" />
+                {r.plantYear
+                  ? <StatBlock label="Plant Year" value={r.plantYear} icon="🌳" />
+                  : <StatBlock label="Planted" value={formatDate(r.plantDate)} icon="🌱" />}
                 <StatBlock label="Harvest" value={formatDate(r.yieldDate)} icon="🌾" />
 {r.yield_lbs > 0 && (() => {
                   const cwt = (r.yield_lbs / 100).toFixed(1);
@@ -1604,25 +1637,17 @@ export default function App({ user }) {
                 ) : null;
               })()}
 
-              {/* First Herbicide */}
-              {hasHerb && (
-                <CardSection label="🧪 First Herbicide" color="#7a4a3a">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {r.herbicideName && <StatBlock label="Product" value={r.herbicideName} icon="🧪" valueColor="#e08870" />}
-                    {r.herbicideRate && <StatBlock label="Rate" value={`${r.herbicideRate} ${r.herbicideUnit || "gal"}/ac`} icon="💉" valueColor="#e08870" />}
-                    {r.herbicideDate && <StatBlock label="Date" value={formatDate(r.herbicideDate)} icon="📆" valueColor="#e08870" />}
-                  </div>
-                </CardSection>
-              )}
-
-              {/* Second Herbicide */}
-              {hasHerb2 && (
-                <CardSection label="🧫 Second Herbicide" color="#6a3a5a">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {r.herb2Name && <StatBlock label="Product" value={r.herb2Name} icon="🧫" valueColor="#c87aaa" />}
-                    {r.herb2Rate && <StatBlock label="Rate" value={`${r.herb2Rate} ${r.herb2Unit || "gal"}/ac`} icon="💉" valueColor="#c87aaa" />}
-                    {r.herb2Date && <StatBlock label="Date" value={formatDate(r.herb2Date)} icon="📆" valueColor="#c87aaa" />}
-                  </div>
+              {/* Spray Log */}
+              {(r.sprayLog || []).length > 0 && (
+                <CardSection label="🧪 Spray Log" color="#8a6a3a">
+                  {(r.sprayLog || []).map((entry, idx) => (
+                    <div key={idx} style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:idx < r.sprayLog.length-1 ? 10 : 0 }}>
+                      {entry.type && <StatBlock label="Type" value={entry.type} icon="🧪" valueColor="#d8b870" />}
+                      {entry.product && <StatBlock label="Product" value={entry.product} icon="💊" valueColor="#e8c870" />}
+                      {entry.rate && <StatBlock label="Rate" value={`${entry.rate} ${entry.unit||"gal"}/ac`} icon="💉" valueColor="#d8b870" />}
+                      {entry.date && <StatBlock label="Date" value={formatDate(entry.date)} icon="📆" valueColor="#d8b870" />}
+                    </div>
+                  ))}
                 </CardSection>
               )}
             </div>
