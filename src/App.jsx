@@ -940,10 +940,26 @@ export default function App({ user }) {
         input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
         select option, select optgroup { background: #ffffff; color: #1a1a0a; }
         select { color: #e8e0c8; }
+        * { -webkit-tap-highlight-color: transparent; }
+        input, select, textarea { font-size: 16px !important; }
+        .rpad { padding-left: clamp(16px,4vw,48px); padding-right: clamp(16px,4vw,48px); }
+        .hdr-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .sort-row { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-bottom: 2px; flex-shrink: 0; }
+        .sort-row::-webkit-scrollbar { display: none; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px,100%), 1fr)); gap: 16px; }
+        @media (max-width: 640px) {
+          .btn-lbl { display: none; }
+          .hdr-btn { padding: 10px 11px !important; }
+          .save-full { width: 100%; padding: 14px 0 !important; font-size: 15px !important; }
+          .controls-row { flex-direction: column; align-items: stretch !important; }
+          .controls-row .sort-row { width: 100%; }
+          .search-input { max-width: 100% !important; }
+          .sign-out-btn { padding: 10px 10px !important; font-size: 10px !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: "2px solid #5a6e2a", padding: "32px 48px 24px", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+      <div className="rpad" style={{ borderBottom: "2px solid #5a6e2a", paddingTop: "clamp(20px,3vw,32px)", paddingBottom: 24, background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
             <span style={{ fontSize: 36, lineHeight: 1 }}>🌾</span>
@@ -951,32 +967,32 @@ export default function App({ user }) {
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#8a9e5a", letterSpacing: "0.15em", textTransform: "uppercase" }}>Rice Variety & Harvest Tracker</p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={() => setShowFieldMgr(!showFieldMgr)}
+        <div className="hdr-btns">
+          <button onClick={() => setShowFieldMgr(!showFieldMgr)} className="hdr-btn"
             style={{ background: showFieldMgr ? "#2a3a1a" : "transparent", border: "1px solid #5a6e2a", color: "#8a9e5a", padding: "10px 20px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-            🗂 Fields
+            🗂 <span className="btn-lbl">Fields</span>
           </button>
-          <button onClick={() => setShowTickets(true)}
+          <button onClick={() => setShowTickets(true)} className="hdr-btn"
             style={{ background: "transparent", border: "1px solid #5a6e2a", color: "#8a9e5a", padding: "10px 20px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-            🚛 Load Tickets
+            🚛 <span className="btn-lbl">Tickets</span>
           </button>
-          <button onClick={() => setShowVariety(true)}
+          <button onClick={() => setShowVariety(true)} className="hdr-btn"
             style={{ background: "transparent", border: "1px solid #5a6e2a", color: "#8a9e5a", padding: "10px 20px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-            🌾 Variety Stats
+            🌾 <span className="btn-lbl">Varieties</span>
           </button>
-          <button onClick={() => setShowReportBuilder(true)}
+          <button onClick={() => setShowReportBuilder(true)} className="hdr-btn"
             style={{ background: "transparent", border: "1px solid #5a6e2a", color: "#8a9e5a", padding: "10px 20px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-            📋 Reports
+            📋 <span className="btn-lbl">Reports</span>
           </button>
-          <button onClick={() => setShowYoY(true)}
+          <button onClick={() => setShowYoY(true)} className="hdr-btn"
             style={{ background: "transparent", border: "1px solid #5a6e2a", color: "#8a9e5a", padding: "10px 20px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}>
-            📊 Year Report
+            📊 <span className="btn-lbl">Year</span>
           </button>
           <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }}
             style={{ background: showForm ? "#3a3a1a" : "#7a9a2a", border: "none", color: "#e8e0c8", padding: "10px 24px", fontSize: 14, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.2s", borderRadius: 2, boxShadow: "0 4px 16px rgba(120,160,40,0.3)" }}>
-            {showForm ? "✕ Cancel" : "+ New Entry"}
+            {showForm ? "✕" : "+ New"}
           </button>
-          <button onClick={() => supabase.auth.signOut()}
+          <button onClick={() => supabase.auth.signOut()} className="sign-out-btn"
             style={{ background: "transparent", border: "1px solid #3a3a1a", color: "#5a6a3a", padding: "10px 16px", fontSize: 12, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2 }}
             title={user.email}>
             Sign Out
@@ -986,7 +1002,7 @@ export default function App({ user }) {
 
       {/* Field Manager */}
       {showFieldMgr && (
-        <div style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid #3a4a1a", padding: "20px 48px", animation: "slideDown 0.2s ease" }}>
+        <div className="rpad" style={{ background: "rgba(255,255,255,0.03)", borderBottom: "1px solid #3a4a1a", paddingTop: 20, paddingBottom: 20, animation: "slideDown 0.2s ease" }}>
           <p style={{ margin: "0 0 12px", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7a8e4a" }}>▸ Manage Fields</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {fields.map(f => (
@@ -1012,7 +1028,7 @@ export default function App({ user }) {
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid #3a4a1a", padding: "28px 48px", animation: "slideDown 0.2s ease" }}>
+        <div className="rpad" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid #3a4a1a", paddingTop: 28, paddingBottom: 28, animation: "slideDown 0.2s ease" }}>
           <h3 style={{ margin: "0 0 24px", fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8a9e5a" }}>
             {editId !== null ? "✎ Edit Record" : "+ New Rice Record"}
           </h3>
@@ -1133,37 +1149,34 @@ export default function App({ user }) {
             </div>
           </div>
 
-          <button onClick={handleSubmit} style={{ background: "#7a9a2a", border: "none", color: "#fff", padding: "10px 32px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2, boxShadow: "0 2px 12px rgba(100,140,20,0.4)" }}>
+          <button onClick={handleSubmit} className="save-full" style={{ background: "#7a9a2a", border: "none", color: "#fff", padding: "10px 32px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2, boxShadow: "0 2px 12px rgba(100,140,20,0.4)" }}>
             {editId !== null ? "Update Record" : "Save Record"}
           </button>
         </div>
       )}
 
       {/* Controls */}
-      <div style={{ padding: "20px 48px", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search field #, variety or notes…"
-          style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.05)",border:"1px solid #3a4a1a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none",maxWidth:280 }} />
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: "#7a8e4a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Sort:</span>
+      <div className="rpad controls-row" style={{ paddingTop: 20, paddingBottom: 20, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search field #, variety or notes…" className="search-input"
+          style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.05)",border:"1px solid #3a4a1a",color:"#e8e0c8",padding:"9px 12px",fontFamily:"Georgia, serif",borderRadius:2,outline:"none",maxWidth:280 }} />
+        <div className="sort-row">
+          <span style={{ fontSize: 11, color: "#7a8e4a", letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}>Sort:</span>
           {[["fieldNumber", "Field #"], ["plantDate", "Planted"], ["yieldDate", "Harvest"], ["variety", "Variety"], ["year", "Year"]].map(([s, label]) => (
-            <button key={s} onClick={() => setSort(s)} style={{ background: sort === s ? "#5a7a1a" : "transparent", border: "1px solid #3a4a1a", color: sort === s ? "#c8d86e" : "#8a9e5a", padding: "4px 12px", fontSize: 11, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2, transition: "all 0.15s" }}>{label}</button>
+            <button key={s} onClick={() => setSort(s)} style={{ background: sort === s ? "#5a7a1a" : "transparent", border: "1px solid #3a4a1a", color: sort === s ? "#c8d86e" : "#8a9e5a", padding: "6px 12px", fontSize: 11, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.1em", borderRadius: 2, transition: "all 0.15s", flexShrink: 0 }}>{label}</button>
           ))}
-        </div>
-        {allYears.length > 0 && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "#7a8e4a", letterSpacing: "0.1em", textTransform: "uppercase" }}>Year:</span>
+          {allYears.length > 0 && (
             <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
-              style={{ background: "#2a3a0a", border: "1px solid #3a4a1a", color: "#c8d86e", padding: "4px 10px", fontSize: 11, fontFamily: "Georgia, serif", borderRadius: 2, outline: "none", cursor: "pointer" }}>
+              style={{ background: "#2a3a0a", border: "1px solid #3a4a1a", color: "#c8d86e", padding: "6px 10px", fontFamily: "Georgia, serif", borderRadius: 2, outline: "none", cursor: "pointer", flexShrink: 0 }}>
               <option value="all">All Years</option>
               {allYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-          </div>
-        )}
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "#6a7e3a" }}>{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#6a7e3a", flexShrink: 0 }}>{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
       {/* Cards */}
-      <div style={{ padding: "0 48px 48px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+      <div className="rpad cards-grid" style={{ paddingBottom: 48 }}>
         {filtered.length === 0 && (
           <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 0", color: "#5a6e2a" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🌱</div>
