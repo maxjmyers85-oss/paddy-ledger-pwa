@@ -2,11 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
 
 // ── Fertilizer section templates ─────────────────────────────────────────────
+// analysisField/rateField/rateIsLiquid/lbsPerGalField drive the NPK calculator
 const FS = {
   aqua: {
     label: "▸ Aqua Ammonia", headerColor: "#4a8a7a",
     borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
     cardLabel: "💧 Aqua Ammonia", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    analysisField: "aquaAnalysis", rateField: "aquaRate",
+    rateIsLiquid: true, defaultLbsPerGal: 5.15,
     fields: [
       { label: "Analysis (N-P-K)", field: "aquaAnalysis", type: "text" },
       { label: "Rate (gal/ac)", field: "aquaRate", type: "number" },
@@ -17,6 +20,7 @@ const FS = {
     label: "▸ Starter Fertilizer", headerColor: "#8a7a3a",
     borderColor: "#6a5a1a", bg: "rgba(120,100,40,0.07)", labelColor: "#9a8e4a",
     cardLabel: "🌱 Starter", cardColor: "#7a6a2a", valueColor: "#c8aa4e",
+    analysisField: "starterAnalysis", rateField: "starterRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "starterProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "starterAnalysis", type: "text" },
@@ -28,6 +32,7 @@ const FS = {
     label: "▸ Topdress", headerColor: "#7a6a9a",
     borderColor: "#5a4a7a", bg: "rgba(100,80,140,0.07)", labelColor: "#9a8ebc",
     cardLabel: "⬆️ Topdress", cardColor: "#6a5a8a", valueColor: "#a890d8",
+    analysisField: "topdressAnalysis", rateField: "topdressRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "topdressProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "topdressAnalysis", type: "text" },
@@ -39,6 +44,7 @@ const FS = {
     label: "▸ Preplant (Broadcast)", headerColor: "#8a7a3a",
     borderColor: "#6a5a1a", bg: "rgba(120,100,40,0.07)", labelColor: "#9a8e4a",
     cardLabel: "🌱 Preplant", cardColor: "#7a6a2a", valueColor: "#c8aa4e",
+    analysisField: "preplantAnalysis", rateField: "preplantRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "preplantProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "preplantAnalysis", type: "text" },
@@ -50,10 +56,13 @@ const FS = {
     label: "▸ Fertigation #1", headerColor: "#4a8a7a",
     borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
     cardLabel: "💧 Fertigation #1", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    analysisField: "fert1Analysis", rateField: "fert1Rate",
+    rateIsLiquid: true, lbsPerGalField: "fert1LbsPerGal",
     fields: [
       { label: "Product", field: "fert1Product", type: "text" },
       { label: "Analysis (N-P-K)", field: "fert1Analysis", type: "text" },
       { label: "Rate (gal/ac)", field: "fert1Rate", type: "number" },
+      { label: "Solution Wt (lbs/gal)", field: "fert1LbsPerGal", type: "number" },
       { label: "Date", field: "fert1Date", type: "date" },
     ],
   },
@@ -61,10 +70,13 @@ const FS = {
     label: "▸ Fertigation #2", headerColor: "#4a7a8a",
     borderColor: "#2a5a6a", bg: "rgba(60,100,120,0.07)", labelColor: "#5a8e9e",
     cardLabel: "💧 Fertigation #2", cardColor: "#3a6a7a", valueColor: "#6ab8d0",
+    analysisField: "fert2Analysis", rateField: "fert2Rate",
+    rateIsLiquid: true, lbsPerGalField: "fert2LbsPerGal",
     fields: [
       { label: "Product", field: "fert2Product", type: "text" },
       { label: "Analysis (N-P-K)", field: "fert2Analysis", type: "text" },
       { label: "Rate (gal/ac)", field: "fert2Rate", type: "number" },
+      { label: "Solution Wt (lbs/gal)", field: "fert2LbsPerGal", type: "number" },
       { label: "Date", field: "fert2Date", type: "date" },
     ],
   },
@@ -72,10 +84,13 @@ const FS = {
     label: "▸ Fertigation #3", headerColor: "#5a6a8a",
     borderColor: "#3a4a6a", bg: "rgba(80,100,140,0.07)", labelColor: "#7a8eae",
     cardLabel: "💧 Fertigation #3", cardColor: "#4a5a7a", valueColor: "#8aaad0",
+    analysisField: "fert3Analysis", rateField: "fert3Rate",
+    rateIsLiquid: true, lbsPerGalField: "fert3LbsPerGal",
     fields: [
       { label: "Product", field: "fert3Product", type: "text" },
       { label: "Analysis (N-P-K)", field: "fert3Analysis", type: "text" },
       { label: "Rate (gal/ac)", field: "fert3Rate", type: "number" },
+      { label: "Solution Wt (lbs/gal)", field: "fert3LbsPerGal", type: "number" },
       { label: "Date", field: "fert3Date", type: "date" },
     ],
   },
@@ -83,6 +98,7 @@ const FS = {
     label: "▸ Sidedress (V4–V6)", headerColor: "#7a6a9a",
     borderColor: "#5a4a7a", bg: "rgba(100,80,140,0.07)", labelColor: "#9a8ebc",
     cardLabel: "↕️ Sidedress", cardColor: "#6a5a8a", valueColor: "#a890d8",
+    analysisField: "sidedressAnalysis", rateField: "sidedressRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "sidedressProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "sidedressAnalysis", type: "text" },
@@ -94,6 +110,7 @@ const FS = {
     label: "▸ Dormant Application (Jan–Feb)", headerColor: "#6a7a9a",
     borderColor: "#4a5a7a", bg: "rgba(80,100,140,0.07)", labelColor: "#8a9ebc",
     cardLabel: "❄️ Dormant", cardColor: "#5a6a8a", valueColor: "#9aaad0",
+    analysisField: "dormantAnalysis", rateField: "dormantRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "dormantProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "dormantAnalysis", type: "text" },
@@ -105,6 +122,7 @@ const FS = {
     label: "▸ Spring Application (Post-Bloom)", headerColor: "#5a8a4a",
     borderColor: "#3a6a2a", bg: "rgba(80,140,60,0.07)", labelColor: "#7aae6a",
     cardLabel: "🌸 Spring App.", cardColor: "#4a7a3a", valueColor: "#90d870",
+    analysisField: "springAnalysis", rateField: "springRate", rateIsLiquid: false,
     fields: [
       { label: "Product", field: "springProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "springAnalysis", type: "text" },
@@ -116,10 +134,13 @@ const FS = {
     label: "▸ Fertigation (Season)", headerColor: "#4a8a7a",
     borderColor: "#2a6a5a", bg: "rgba(60,120,100,0.07)", labelColor: "#5a9e8a",
     cardLabel: "💧 Fertigation", cardColor: "#4a7a6a", valueColor: "#5ab8a0",
+    analysisField: "fertigationAnalysis", rateField: "fertigationRate",
+    rateIsLiquid: true, lbsPerGalField: "fertigationLbsPerGal",
     fields: [
       { label: "Product", field: "fertigationProduct", type: "text" },
       { label: "Analysis (N-P-K)", field: "fertigationAnalysis", type: "text" },
       { label: "Rate (gal/ac/app)", field: "fertigationRate", type: "number" },
+      { label: "Solution Wt (lbs/gal)", field: "fertigationLbsPerGal", type: "number" },
       { label: "# Applications", field: "fertigationApps", type: "number" },
       { label: "Start Date", field: "fertigationDate", type: "date" },
     ],
@@ -202,6 +223,16 @@ const CROP_CONFIGS = {
     fertSections: [FS.starter, FS.topdress],
     showNPK: false,
   },
+  walnuts: {
+    label: "Walnuts", icon: "🌳",
+    varieties: ["Chandler","Hartley","Howard","Tulare","Vina","Franquette","Serr","Chico","Other"],
+    yieldLabel: "Total Harvest (lbs)",
+    extraFields: [
+      { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
+    ],
+    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    showNPK: false,
+  },
 };
 
 const VARIETIES = [
@@ -240,7 +271,8 @@ const emptyForm = {
   // almonds
   dormantProduct: "", dormantAnalysis: "", dormantRate: "", dormantDate: "",
   springProduct: "", springAnalysis: "", springRate: "", springDate: "",
-  fertigationProduct: "", fertigationAnalysis: "", fertigationRate: "", fertigationApps: "", fertigationDate: "",
+  fertigationProduct: "", fertigationAnalysis: "", fertigationRate: "", fertigationApps: "", fertigationDate: "", fertigationLbsPerGal: "",
+  fert1LbsPerGal: "", fert2LbsPerGal: "", fert3LbsPerGal: "",
   foliarProduct: "", foliarRate: "", foliarDate: "",
   // herbicides
   herbicideName: "", herbicideRate: "", herbicideUnit: "gal", herbicideDate: "",
@@ -273,6 +305,25 @@ function calcNPKTotal(r) {
   const [sN,sP,sK] = calcNPK(r.starterRate, r.starterAnalysis, false);
   const [tN,tP,tK] = calcNPK(r.topdressRate, r.topdressAnalysis, false);
   return sumNPK([aN,aP,aK],[sN,sP,sK],[tN,tP,tK]);
+}
+function calcSectionNPK(record, sec) {
+  if (!sec.analysisField || !sec.rateField) return null;
+  const analysis = record[sec.analysisField];
+  const rate = parseFloat(record[sec.rateField]);
+  if (!analysis || !rate) return null;
+  let lbsApplied;
+  if (sec.rateIsLiquid) {
+    const lbsPerGal = sec.lbsPerGalField
+      ? (parseFloat(record[sec.lbsPerGalField]) || sec.defaultLbsPerGal)
+      : sec.defaultLbsPerGal;
+    if (!lbsPerGal) return null;
+    lbsApplied = rate * lbsPerGal;
+  } else {
+    lbsApplied = rate;
+  }
+  const [n, p, k] = parseNPK(analysis);
+  if (n === 0 && p === 0 && k === 0) return null;
+  return [lbsApplied * n / 100, lbsApplied * p / 100, lbsApplied * k / 100];
 }
 
 // ── Print Modal ─────────────────────────────────────────────────────────────
@@ -1328,13 +1379,44 @@ export default function App({ user }) {
             );
           })()}
 
-          {(CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice).fertSections.map((sec, i) => (
-            <React.Fragment key={i}>
-              <SectionHeader color={sec.headerColor} label={sec.label} />
-              <FertBox borderColor={sec.borderColor} bg={sec.bg} labelColor={sec.labelColor}
-                fields={sec.fields} form={form} setForm={setForm} />
-            </React.Fragment>
-          ))}
+          {(() => {
+            const cfg = CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice;
+            const sectionNPKs = cfg.fertSections.map(sec => calcSectionNPK(form, sec));
+            const hasAnyNPK = sectionNPKs.some(Boolean);
+            const totals = sectionNPKs.reduce((acc, npk) => npk ? [acc[0]+npk[0], acc[1]+npk[1], acc[2]+npk[2]] : acc, [0,0,0]);
+            return (
+              <>
+                {cfg.fertSections.map((sec, i) => {
+                  const npk = sectionNPKs[i];
+                  return (
+                    <React.Fragment key={i}>
+                      <SectionHeader color={sec.headerColor} label={sec.label} />
+                      <FertBox borderColor={sec.borderColor} bg={sec.bg} labelColor={sec.labelColor}
+                        fields={sec.fields} form={form} setForm={setForm} />
+                      {npk && (
+                        <div style={{ marginTop: -16, marginBottom: 24, padding: "7px 14px", background: "rgba(255,255,255,0.03)", borderLeft: `3px solid ${sec.borderColor}`, borderRadius: 2, fontSize: 12, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ color: "#6a7e4a", letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 10 }}>NPK:</span>
+                          <span>N: <strong style={{ color: "#a8e870" }}>{npk[0].toFixed(1)}</strong> lbs/ac</span>
+                          <span>P: <strong style={{ color: "#e8c870" }}>{npk[1].toFixed(1)}</strong> lbs/ac</span>
+                          <span>K: <strong style={{ color: "#70b8e8" }}>{npk[2].toFixed(1)}</strong> lbs/ac</span>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {hasAnyNPK && (
+                  <div style={{ marginBottom: 24, padding: "12px 16px", background: "rgba(120,160,40,0.08)", border: "1px solid #4a6a1a", borderRadius: 2 }}>
+                    <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "#7a9e4a", marginBottom: 8 }}>▸ Total N-P-K Applied (lbs/ac)</div>
+                    <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#e8e0c8" }}>N: <span style={{ color: "#a8e870" }}>{totals[0].toFixed(1)}</span></span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#e8e0c8" }}>P: <span style={{ color: "#e8c870" }}>{totals[1].toFixed(1)}</span></span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#e8e0c8" }}>K: <span style={{ color: "#70b8e8" }}>{totals[2].toFixed(1)}</span></span>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           <SectionHeader color="#8a4a3a" label="▸ First Herbicide" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24, padding: "16px", background: "rgba(140,60,40,0.07)", borderLeft: "3px solid #6a2a1a", borderRadius: 2 }}>
@@ -1505,12 +1587,11 @@ export default function App({ user }) {
                 );
               })}
 
-              {/* Fertilizer Totals — rice only */}
-              {rcfg.showNPK && (r.aquaRate || r.starterRate || r.topdressRate) && (() => {
-                const [aN, aP, aK] = calcNPK(r.aquaRate, r.aquaAnalysis || "20-0-0", true);
-                const [sN, sP, sK] = calcNPK(r.starterRate, r.starterAnalysis, false);
-                const [tN, tP, tK] = calcNPK(r.topdressRate, r.topdressAnalysis, false);
-                const [totN, totP, totK] = sumNPK([aN,aP,aK],[sN,sP,sK],[tN,tP,tK]);
+              {/* Fertilizer Totals — all crops */}
+              {(() => {
+                const secNPKs = rcfg.fertSections.map(sec => calcSectionNPK(r, sec)).filter(Boolean);
+                if (!secNPKs.length) return null;
+                const [totN, totP, totK] = secNPKs.reduce((acc, [n,p,k]) => [acc[0]+n, acc[1]+p, acc[2]+k], [0,0,0]);
                 const fmt = v => v > 0 ? `${v.toFixed(1)} lbs/ac` : null;
                 return (totN > 0 || totP > 0 || totK > 0) ? (
                   <CardSection label="📊 N-P-K Totals" color="#6a8a3a">
