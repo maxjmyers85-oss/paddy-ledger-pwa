@@ -112,7 +112,7 @@ function PrintModal({ r, onClose }) {
             </div>
             <div style={{ fontSize: 11, color: "#9a9a7a", textAlign: "right" }}>
               {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}<br/>
-              Rice Variety & Harvest Tracker
+              Rice Record Tracker
             </div>
           </div>
 
@@ -190,7 +190,7 @@ function PrintModal({ r, onClose }) {
 
           {/* Footer */}
           <div style={{ marginTop: 28, borderTop: "1px solid #d0d8b0", paddingTop: 10, fontSize: 10, color: "#aaa", letterSpacing: "0.1em", display: "flex", justifyContent: "space-between" }}>
-            <span>PADDY LEDGER — Rice Variety & Harvest Tracker</span>
+            <span>PADDY LEDGER — Rice Record Tracker</span>
             <span>Field: {r.fieldNumber || "—"} · Variety: {r.variety}</span>
           </div>
         </div>
@@ -965,7 +965,7 @@ export default function App({ user }) {
             <span style={{ fontSize: 36, lineHeight: 1 }}>🌾</span>
             <h1 style={{ margin: 0, fontSize: "clamp(22px, 4vw, 38px)", fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e", textShadow: "0 2px 12px rgba(160,180,60,0.3)" }}>PADDY LEDGER</h1>
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#8a9e5a", letterSpacing: "0.15em", textTransform: "uppercase" }}>Rice Variety & Harvest Tracker</p>
+          <p style={{ margin: 0, fontSize: 13, color: "#8a9e5a", letterSpacing: "0.15em", textTransform: "uppercase" }}>Rice Record Tracker</p>
         </div>
         <div className="hdr-btns">
           <button onClick={() => setShowFieldMgr(!showFieldMgr)} className="hdr-btn"

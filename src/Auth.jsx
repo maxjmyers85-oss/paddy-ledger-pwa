@@ -45,7 +45,7 @@ export default function Auth() {
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{ fontSize: 48, marginBottom: 10 }}>🌾</div>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "0.04em", color: "#c8d86e" }}>PADDY LEDGER</h1>
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#7a8e4a", letterSpacing: "0.2em", textTransform: "uppercase" }}>Rice Variety & Harvest Tracker</p>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#7a8e4a", letterSpacing: "0.2em", textTransform: "uppercase" }}>Rice Record Tracker</p>
         </div>
 
         {/* Card */}
