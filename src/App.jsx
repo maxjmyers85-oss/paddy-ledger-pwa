@@ -185,7 +185,8 @@ const CROP_CONFIGS = {
       { label: "Brix", field: "brix", type: "number" },
       { label: "Processor / Contract", field: "processor", type: "text" },
     ],
-    fertSections: [FS.preplant, FS.fert1, FS.fert2, FS.fert3, FS.sidedress],
+    fertSections: [FS.preplant, FS.sidedress],
+    hasFertigationLog: true,
     showNPK: false,
   },
   wheat: {
@@ -216,7 +217,8 @@ const CROP_CONFIGS = {
     yieldLabel: "Total Harvest (lbs)",
     isPerennial: true,
     extraFields: [],
-    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    fertSections: [FS.dormant, FS.spring, FS.foliar],
+    hasFertigationLog: true,
     showNPK: false,
   },
   sunflowers: {
@@ -235,7 +237,8 @@ const CROP_CONFIGS = {
     extraFields: [
       { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
     ],
-    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    fertSections: [FS.dormant, FS.spring, FS.foliar],
+    hasFertigationLog: true,
     showNPK: false,
   },
   pistachios: {
@@ -246,7 +249,8 @@ const CROP_CONFIGS = {
     extraFields: [
       { label: "Hull Split Date", field: "hullSplitDate", type: "date" },
     ],
-    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    fertSections: [FS.dormant, FS.spring, FS.foliar],
+    hasFertigationLog: true,
     showNPK: false,
   },
   pecans: {
@@ -255,7 +259,8 @@ const CROP_CONFIGS = {
     yieldLabel: "Total Harvest (lbs)",
     isPerennial: true,
     extraFields: [],
-    fertSections: [FS.dormant, FS.spring, FS.fertigation, FS.foliar],
+    fertSections: [FS.dormant, FS.spring, FS.foliar],
+    hasFertigationLog: true,
     showNPK: false,
   },
 };
@@ -287,18 +292,15 @@ const emptyForm = {
   aquaAnalysis: "20-0-0", aquaRate: "", aquaDate: "",
   starterProduct: "", starterAnalysis: "", starterRate: "", starterDate: "",
   topdressProduct: "", topdressAnalysis: "", topdressRate: "", topdressDate: "",
-  // tomatoes
+  // tomatoes / grain
   preplantProduct: "", preplantAnalysis: "", preplantRate: "", preplantDate: "",
-  fert1Product: "", fert1Analysis: "", fert1Rate: "", fert1Date: "",
-  fert2Product: "", fert2Analysis: "", fert2Rate: "", fert2Date: "",
-  fert3Product: "", fert3Analysis: "", fert3Rate: "", fert3Date: "",
   sidedressProduct: "", sidedressAnalysis: "", sidedressRate: "", sidedressDate: "",
   // perennials
   dormantProduct: "", dormantAnalysis: "", dormantRate: "", dormantDate: "",
   springProduct: "", springAnalysis: "", springRate: "", springDate: "",
-  fertigationProduct: "", fertigationAnalysis: "", fertigationRate: "", fertigationApps: "", fertigationDate: "", fertigationLbsPerGal: "",
-  fert1LbsPerGal: "", fert2LbsPerGal: "", fert3LbsPerGal: "",
   foliarProduct: "", foliarRate: "", foliarDate: "",
+  // fertigation log (replaces fert1/2/3 and fertigation flat fields)
+  fertigationLog: [],
   // crop-specific extras
   brix: "", processor: "", seedingRate: "", protein: "", testWeight: "",
   population: "", hullSplitDate: "",
@@ -348,6 +350,17 @@ function calcSectionNPK(record, sec) {
   const [n, p, k] = parseNPK(analysis);
   if (n === 0 && p === 0 && k === 0) return null;
   return [lbsApplied * n / 100, lbsApplied * p / 100, lbsApplied * k / 100];
+}
+function calcFertigationLogNPK(record) {
+  return (record.fertigationLog || []).reduce((acc, entry) => {
+    const rate = parseFloat(entry.rate);
+    const lbsPerGal = parseFloat(entry.lbsPerGal);
+    const apps = parseFloat(entry.apps) || 1;
+    if (!rate || !lbsPerGal || !entry.analysis) return acc;
+    const lbsApplied = rate * lbsPerGal * apps;
+    const [n, p, k] = parseNPK(entry.analysis);
+    return [acc[0] + lbsApplied * n / 100, acc[1] + lbsApplied * p / 100, acc[2] + lbsApplied * k / 100];
+  }, [0, 0, 0]);
 }
 
 // ── Print Modal ─────────────────────────────────────────────────────────────
@@ -469,6 +482,21 @@ function PrintModal({ r, onClose }) {
               </Section>
             ) : null;
           })()}
+
+          {(r.fertigationLog || []).length > 0 && (
+            <Section title="Fertigation Log">
+              {(r.fertigationLog || []).map((entry, idx) => (
+                <React.Fragment key={idx}>
+                  <Row label={`#${idx+1} Product`} value={entry.product} />
+                  <Row label={`#${idx+1} Analysis`} value={entry.analysis} />
+                  <Row label={`#${idx+1} Rate`} value={entry.rate ? `${entry.rate} gal/ac/app` : null} />
+                  <Row label={`#${idx+1} Solution Wt`} value={entry.lbsPerGal ? `${entry.lbsPerGal} lbs/gal` : null} />
+                  <Row label={`#${idx+1} Applications`} value={entry.apps} />
+                  <Row label={`#${idx+1} Date`} value={entry.date ? formatDate(entry.date) : null} />
+                </React.Fragment>
+              ))}
+            </Section>
+          )}
 
           {(r.sprayLog || []).length > 0 && (
             <Section title="Spray Log">
@@ -802,56 +830,112 @@ function VarietyModal({ records, onClose }) {
 function ReportBuilderModal({ records, allYears, onClose }) {
   const allVarieties = [...new Set(records.map(r=>r.variety).filter(Boolean))].sort();
   const allFieldNums = [...new Set(records.map(r=>r.fieldNumber).filter(Boolean))].sort();
+  const allCrops = [...new Set(records.map(r=>r.cropType||"rice").filter(Boolean))].sort();
 
   const COLUMNS = [
-    { key:"fieldNumber", label:"Field #" },
-    { key:"variety", label:"Variety" },
-    { key:"acres", label:"Acres" },
-    { key:"plantDate", label:"Plant Date" },
-    { key:"yieldDate", label:"Harvest Date" },
-    { key:"growthDays", label:"Growth Days" },
-    { key:"yield_lbs", label:"Yield (lbs)" },
-    { key:"yield_cwt", label:"Yield (cwt)" },
-    { key:"yield_cwtac", label:"Yield (cwt/ac)" },
-    { key:"aquaRate", label:"Aqua Rate (gal/ac)" },
-    { key:"aquaDate", label:"Aqua Date" },
-    { key:"starterProduct", label:"Starter Product" },
-    { key:"starterRate", label:"Starter Rate (lbs/ac)" },
-    { key:"starterDate", label:"Starter Date" },
-    { key:"topdressProduct", label:"Topdress Product" },
-    { key:"topdressRate", label:"Topdress Rate (lbs/ac)" },
-    { key:"topdressDate", label:"Topdress Date" },
-    { key:"herbicideName", label:"1st Herb. Product" },
-    { key:"herbicideRate", label:"1st Herb. Rate" },
-    { key:"herbicideDate", label:"1st Herb. Date" },
-    { key:"herb2Name", label:"2nd Herb. Product" },
-    { key:"herb2Rate", label:"2nd Herb. Rate" },
-    { key:"herb2Date", label:"2nd Herb. Date" },
-    { key:"notes", label:"Notes" },
+    { key:"cropType",        label:"Crop Type",             group:"General" },
+    { key:"fieldNumber",     label:"Field #",               group:"General" },
+    { key:"variety",         label:"Variety",               group:"General" },
+    { key:"acres",           label:"Acres",                 group:"General" },
+    { key:"plantDate",       label:"Plant Date",            group:"General" },
+    { key:"plantYear",       label:"Plant Year",            group:"General" },
+    { key:"yieldDate",       label:"Harvest Date",          group:"General" },
+    { key:"growthDays",      label:"Growth Days",           group:"General" },
+    { key:"yield_lbs",       label:"Yield (lbs)",           group:"General" },
+    { key:"yield_cwt",       label:"Yield (cwt)",           group:"General" },
+    { key:"yield_cwtac",     label:"Yield (cwt/ac)",        group:"General" },
+    { key:"notes",           label:"Notes",                 group:"General" },
+    { key:"aquaRate",        label:"Aqua Rate (gal/ac)",    group:"Fertilizer" },
+    { key:"aquaDate",        label:"Aqua Date",             group:"Fertilizer" },
+    { key:"starterProduct",  label:"Starter Product",       group:"Fertilizer" },
+    { key:"starterRate",     label:"Starter Rate (lbs/ac)", group:"Fertilizer" },
+    { key:"starterDate",     label:"Starter Date",          group:"Fertilizer" },
+    { key:"topdressProduct", label:"Topdress Product",      group:"Fertilizer" },
+    { key:"topdressRate",    label:"Topdress Rate (lbs/ac)",group:"Fertilizer" },
+    { key:"topdressDate",    label:"Topdress Date",         group:"Fertilizer" },
+    { key:"preplantProduct", label:"Preplant Product",      group:"Fertilizer" },
+    { key:"preplantRate",    label:"Preplant Rate (lbs/ac)",group:"Fertilizer" },
+    { key:"sidedressProduct",label:"Sidedress Product",     group:"Fertilizer" },
+    { key:"sidedressRate",   label:"Sidedress Rate (lbs/ac)",group:"Fertilizer" },
+    { key:"dormantProduct",  label:"Dormant Product",       group:"Fertilizer" },
+    { key:"dormantRate",     label:"Dormant Rate (lbs/ac)", group:"Fertilizer" },
+    { key:"springProduct",   label:"Spring App. Product",   group:"Fertilizer" },
+    { key:"springRate",      label:"Spring App. Rate",      group:"Fertilizer" },
+    { key:"fertigCount",     label:"Fertigation Events",    group:"Fertilizer" },
+    { key:"npk_n",           label:"Total N (lbs/ac)",      group:"NPK" },
+    { key:"npk_p",           label:"Total P (lbs/ac)",      group:"NPK" },
+    { key:"npk_k",           label:"Total K (lbs/ac)",      group:"NPK" },
+    { key:"sprayCount",      label:"Spray Events",          group:"Spray Log" },
+    { key:"spray1Type",      label:"1st Spray Type",        group:"Spray Log" },
+    { key:"spray1Product",   label:"1st Spray Product",     group:"Spray Log" },
+    { key:"spray1Rate",      label:"1st Spray Rate",        group:"Spray Log" },
+    { key:"spray1Date",      label:"1st Spray Date",        group:"Spray Log" },
+    { key:"brix",            label:"Brix",                  group:"Crop Details" },
+    { key:"processor",       label:"Processor",             group:"Crop Details" },
+    { key:"seedingRate",     label:"Seeding Rate",          group:"Crop Details" },
+    { key:"protein",         label:"Protein %",             group:"Crop Details" },
+    { key:"testWeight",      label:"Test Weight",           group:"Crop Details" },
+    { key:"population",      label:"Population",            group:"Crop Details" },
+    { key:"hullSplitDate",   label:"Hull Split Date",       group:"Crop Details" },
   ];
 
-  const [selectedCols, setSelectedCols] = React.useState(["fieldNumber","variety","acres","plantDate","yieldDate","yield_cwt","yield_cwtac"]);
-  const [filterYear, setFilterYear] = React.useState("all");
+  const GROUPS = [...new Set(COLUMNS.map(c=>c.group))];
+
+  const [selectedCols, setSelectedCols] = React.useState(["cropType","fieldNumber","variety","acres","plantDate","plantYear","yieldDate","yield_cwt","yield_cwtac"]);
+  const [filterYear,    setFilterYear]    = React.useState("all");
+  const [filterCrop,    setFilterCrop]    = React.useState("all");
   const [filterVariety, setFilterVariety] = React.useState("all");
-  const [filterField, setFilterField] = React.useState("all");
-  const [reportTitle, setReportTitle] = React.useState("Custom Field Report");
+  const [filterField,   setFilterField]   = React.useState("all");
+  const [reportTitle,   setReportTitle]   = React.useState("Custom Field Report");
+  const [sortCol,       setSortCol]       = React.useState("fieldNumber");
+  const [sortDir,       setSortDir]       = React.useState("asc");
 
   const toggleCol = col => setSelectedCols(prev => prev.includes(col) ? prev.filter(c=>c!==col) : [...prev, col]);
+  const toggleSort = col => { if (sortCol === col) setSortDir(d => d==="asc"?"desc":"asc"); else { setSortCol(col); setSortDir("asc"); } };
 
   const getVal = (r, key) => {
+    const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
+    if (key === "cropType") return (CROP_CONFIGS[r.cropType||"rice"]||{label:r.cropType||"Rice"}).label;
     if (key === "growthDays") { if(!r.plantDate||!r.yieldDate) return "—"; return Math.round((new Date(r.yieldDate)-new Date(r.plantDate))/86400000)+"d"; }
     if (key === "yield_cwt") return r.yield_lbs>0?(r.yield_lbs/100).toFixed(1):"—";
     if (key === "yield_cwtac") { const ac=parseFloat(r.acres)||0; return r.yield_lbs>0&&ac>0?(r.yield_lbs/100/ac).toFixed(1):"—"; }
-    if (key === "plantDate"||key==="yieldDate"||key==="aquaDate"||key==="starterDate"||key==="topdressDate"||key==="herbicideDate"||key==="herb2Date") return r[key]?formatDate(r[key]):"—";
+    if (["plantDate","yieldDate","aquaDate","starterDate","topdressDate","preplantDate","sidedressDate","dormantDate","springDate","hullSplitDate"].includes(key)) return r[key]?formatDate(r[key]):"—";
+    if (key === "fertigCount") return (r.fertigationLog||[]).length || "—";
+    if (key === "sprayCount") return (r.sprayLog||[]).length || "—";
+    if (key === "spray1Type") return (r.sprayLog||[])[0]?.type || "—";
+    if (key === "spray1Product") return (r.sprayLog||[])[0]?.product || "—";
+    if (key === "spray1Rate") { const e=(r.sprayLog||[])[0]; return e?.rate?`${e.rate} ${e.unit||"gal"}/ac`:"—"; }
+    if (key === "spray1Date") { const e=(r.sprayLog||[])[0]; return e?.date?formatDate(e.date):"—"; }
+    if (key === "npk_n" || key === "npk_p" || key === "npk_k") {
+      const secNPKs = rcfg.fertSections.map(sec => calcSectionNPK(r, sec)).filter(Boolean);
+      const fNPK = calcFertigationLogNPK(r);
+      const base = secNPKs.reduce((acc,[n,p,k])=>[acc[0]+n,acc[1]+p,acc[2]+k],[0,0,0]);
+      const tot = [base[0]+fNPK[0], base[1]+fNPK[1], base[2]+fNPK[2]];
+      const idx = key==="npk_n"?0:key==="npk_p"?1:2;
+      return tot[idx]>0?tot[idx].toFixed(1):"—";
+    }
     return r[key]||"—";
   };
 
-  const filtered = records.filter(r => {
-    if (filterYear!=="all" && (!r.plantDate||new Date(r.plantDate).getFullYear()!==parseInt(filterYear))) return false;
-    if (filterVariety!=="all" && r.variety!==filterVariety) return false;
-    if (filterField!=="all" && r.fieldNumber!==filterField) return false;
-    return true;
-  });
+  const getSortVal = (r, col) => {
+    const v = getVal(r, col);
+    const n = parseFloat(v);
+    return isNaN(n) ? (v === "—" ? "" : v.toLowerCase()) : n;
+  };
+
+  const filtered = records
+    .filter(r => {
+      if (filterYear!=="all" && (!r.plantDate||new Date(r.plantDate).getFullYear()!==parseInt(filterYear))) return false;
+      if (filterCrop!=="all" && (r.cropType||"rice")!==filterCrop) return false;
+      if (filterVariety!=="all" && r.variety!==filterVariety) return false;
+      if (filterField!=="all" && r.fieldNumber!==filterField) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const av = getSortVal(a, sortCol), bv = getSortVal(b, sortCol);
+      const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
 
   const colLabel = key => COLUMNS.find(c=>c.key===key)?.label||key;
 
@@ -861,7 +945,7 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle}</title>
     <style>body{font-family:Georgia,serif;color:#1a1a0a;padding:32px 40px}h1{font-size:22px;color:#3a5a0a;margin-bottom:4px}p{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#eef4d8;padding:7px 8px;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#4a6a0a;border-bottom:2px solid #c8d880}td{padding:6px 8px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafdf0}.footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between}@media print{@page{margin:.5in}}</style>
     </head><body><h1>🌾 ${reportTitle}</h1>
-    <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})} · ${filtered.length} records</p>
+    <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})} · ${filtered.length} records · sorted by ${colLabel(sortCol)} ${sortDir}</p>
     <table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>
     <div class="footer"><span>Golden State Grower — ${reportTitle}</span><span>${filtered.length} records</span></div>
     </body></html>`;
@@ -874,11 +958,11 @@ function ReportBuilderModal({ records, allYears, onClose }) {
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 16px",overflowY:"auto" }}
       onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:1000,borderRadius:4,boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div style={{ background:"#1a240a",border:"1px solid #3a4a1a",width:"100%",maxWidth:1100,borderRadius:4,boxShadow:"0 20px 60px rgba(0,0,0,0.6)" }}>
 
         {/* Header */}
         <div style={{ background:"#243010",padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-          <span style={{ color:"#c8d86e",fontSize:13,letterSpacing:"0.1em",textTransform:"uppercase" }}>📋 Custom Report Builder</span>
+          <span style={{ color:"#c8d86e",fontSize:13,letterSpacing:"0.1em",textTransform:"uppercase" }}>📋 Report Builder</span>
           <div style={{ display:"flex",gap:8 }}>
             <button onClick={printReport} style={{ background:"#7a9a2a",border:"none",color:"#fff",padding:"7px 18px",fontSize:12,fontFamily:"inherit",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase",borderRadius:2 }}>Print / PDF</button>
             <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",padding:"7px 14px",fontSize:12,fontFamily:"inherit",cursor:"pointer",borderRadius:2 }}>✕ Close</button>
@@ -889,16 +973,17 @@ function ReportBuilderModal({ records, allYears, onClose }) {
           {/* Report title */}
           <div style={{ marginBottom:20 }}>
             <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a",marginBottom:6 }}>Report Title</label>
-            <input value={reportTitle} onChange={e=>setReportTitle(e.target.value)} style={{ ...btnStyle,width:360 }} />
+            <input value={reportTitle} onChange={e=>setReportTitle(e.target.value)} style={{ ...btnStyle,width:"100%",maxWidth:400,boxSizing:"border-box" }} />
           </div>
 
           {/* Filters */}
           <p style={{ margin:"0 0 10px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a" }}>▸ Filters</p>
-          <div style={{ display:"flex",gap:12,flexWrap:"wrap",marginBottom:24,padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:3,border:"1px solid #2a3a0a" }}>
+          <div style={{ display:"flex",gap:12,flexWrap:"wrap",marginBottom:20,padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:3,border:"1px solid #2a3a0a" }}>
             {[
-              ["Year", filterYear, setFilterYear, [["all","All Years"],...allYears.map(y=>[String(y),String(y)])]],
+              ["Year",    filterYear,    setFilterYear,    [["all","All Years"],   ...allYears.map(y=>[String(y),String(y)])]],
+              ["Crop",    filterCrop,    setFilterCrop,    [["all","All Crops"],   ...allCrops.map(c=>[c,(CROP_CONFIGS[c]||{label:c}).label])]],
               ["Variety", filterVariety, setFilterVariety, [["all","All Varieties"],...allVarieties.map(v=>[v,v])]],
-              ["Field", filterField, setFilterField, [["all","All Fields"],...allFieldNums.map(f=>[f,f])]],
+              ["Field",   filterField,   setFilterField,   [["all","All Fields"],  ...allFieldNums.map(f=>[f,f])]],
             ].map(([label, val, set, opts]) => (
               <div key={label}>
                 <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a",marginBottom:6 }}>{label}</label>
@@ -912,35 +997,50 @@ function ReportBuilderModal({ records, allYears, onClose }) {
             </div>
           </div>
 
-          {/* Column picker */}
+          {/* Column picker — grouped */}
           <p style={{ margin:"0 0 10px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a" }}>▸ Columns to Include</p>
-          <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginBottom:24,padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:3,border:"1px solid #2a3a0a" }}>
-            {COLUMNS.map(({key,label}) => {
-              const on = selectedCols.includes(key);
-              return (
-                <button key={key} onClick={()=>toggleCol(key)} style={{ background:on?"#3a6a1a":"rgba(255,255,255,0.04)",border:`1px solid ${on?"#5a9a2a":"#2a3a0a"}`,color:on?"#c8d86e":"#6a7e4a",padding:"5px 12px",fontSize:11,fontFamily:"Georgia,serif",cursor:"pointer",borderRadius:2,letterSpacing:"0.05em",transition:"all 0.15s" }}>
-                  {on?"✓ ":""}{label}
-                </button>
-              );
-            })}
+          <div style={{ marginBottom:20,padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:3,border:"1px solid #2a3a0a" }}>
+            {GROUPS.map(group => (
+              <div key={group} style={{ marginBottom:12 }}>
+                <div style={{ fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a7a3a",marginBottom:6 }}>{group}</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+                  {COLUMNS.filter(c=>c.group===group).map(({key,label}) => {
+                    const on = selectedCols.includes(key);
+                    return (
+                      <button key={key} onClick={()=>toggleCol(key)} style={{ background:on?"#3a6a1a":"rgba(255,255,255,0.04)",border:`1px solid ${on?"#5a9a2a":"#2a3a0a"}`,color:on?"#c8d86e":"#6a7e4a",padding:"4px 10px",fontSize:11,fontFamily:"Georgia,serif",cursor:"pointer",borderRadius:2,letterSpacing:"0.04em",transition:"all 0.15s" }}>
+                        {on?"✓ ":""}{label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Preview */}
-          <p style={{ margin:"0 0 10px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a" }}>▸ Preview</p>
+          {/* Preview with sortable headers */}
+          <p style={{ margin:"0 0 10px",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#7a8e4a" }}>▸ Preview — click column header to sort</p>
           <div style={{ overflowX:"auto",border:"1px solid #2a3a0a",borderRadius:3 }}>
             <table style={{ width:"100%",borderCollapse:"collapse",minWidth:400 }}>
               <thead>
                 <tr style={{ background:"rgba(255,255,255,0.04)" }}>
-                  {selectedCols.map(k=><th key={k} style={{ padding:"7px 12px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:"#8a9e5a",borderBottom:"2px solid #3a4a1a",textAlign:"left",whiteSpace:"nowrap" }}>{colLabel(k)}</th>)}
+                  {selectedCols.map(k => {
+                    const active = sortCol === k;
+                    return (
+                      <th key={k} onClick={()=>toggleSort(k)} style={{ padding:"8px 12px",fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:active?"#c8d86e":"#8a9e5a",borderBottom:"2px solid #3a4a1a",textAlign:"left",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none",background:active?"rgba(255,255,255,0.06)":"transparent" }}>
+                        {colLabel(k)} {active?(sortDir==="asc"?"▲":"▼"):""}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0,8).map((r,i)=>(
+                {filtered.slice(0,10).map((r,i)=>(
                   <tr key={r.id} style={{ background:i%2===0?"transparent":"rgba(255,255,255,0.02)" }}>
                     {selectedCols.map(k=><td key={k} style={{ padding:"6px 12px",fontSize:12,borderBottom:"1px solid #2a3a0a",color:"#c8d86e",whiteSpace:"nowrap" }}>{getVal(r,k)}</td>)}
                   </tr>
                 ))}
-                {filtered.length>8 && <tr><td colSpan={selectedCols.length} style={{ padding:"8px 12px",fontSize:11,color:"#5a7a2a",fontStyle:"italic",borderBottom:"1px solid #2a3a0a" }}>...and {filtered.length-8} more rows in the printed report</td></tr>}
+                {filtered.length>10 && <tr><td colSpan={selectedCols.length} style={{ padding:"8px 12px",fontSize:11,color:"#5a7a2a",fontStyle:"italic",borderBottom:"1px solid #2a3a0a" }}>...and {filtered.length-10} more rows in the printed report</td></tr>}
+                {filtered.length===0 && <tr><td colSpan={selectedCols.length} style={{ padding:"20px 12px",fontSize:12,color:"#4a5a2a",textAlign:"center",fontStyle:"italic" }}>No records match the current filters</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1409,8 +1509,11 @@ export default function App({ user }) {
           {(() => {
             const cfg = CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice;
             const sectionNPKs = cfg.fertSections.map(sec => calcSectionNPK(form, sec));
-            const hasAnyNPK = sectionNPKs.some(Boolean);
-            const totals = sectionNPKs.reduce((acc, npk) => npk ? [acc[0]+npk[0], acc[1]+npk[1], acc[2]+npk[2]] : acc, [0,0,0]);
+            const fertigNPK = calcFertigationLogNPK(form);
+            const fertigHasNPK = fertigNPK[0] > 0 || fertigNPK[1] > 0 || fertigNPK[2] > 0;
+            const hasAnyNPK = sectionNPKs.some(Boolean) || fertigHasNPK;
+            const sectTotals = sectionNPKs.reduce((acc, npk) => npk ? [acc[0]+npk[0], acc[1]+npk[1], acc[2]+npk[2]] : acc, [0,0,0]);
+            const totals = [sectTotals[0]+fertigNPK[0], sectTotals[1]+fertigNPK[1], sectTotals[2]+fertigNPK[2]];
             return (
               <>
                 {cfg.fertSections.map((sec, i) => {
@@ -1444,6 +1547,56 @@ export default function App({ user }) {
               </>
             );
           })()}
+
+          {(CROP_CONFIGS[form.cropType] || CROP_CONFIGS.rice).hasFertigationLog && (<>
+            <SectionHeader color="#4a8a7a" label="▸ Fertigation Log" />
+            <div style={{ marginBottom: 24 }}>
+              {(form.fertigationLog || []).map((entry, idx) => {
+                const update = (field, val) => setForm({ ...form, fertigationLog: form.fertigationLog.map((e, i) => i === idx ? { ...e, [field]: val } : e) });
+                return (
+                  <div key={idx} style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))",gap:10,marginBottom:10,padding:"14px",background:"rgba(60,120,100,0.08)",borderLeft:"3px solid #2a6a5a",borderRadius:2 }}>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}>Product</label>
+                      <input type="text" value={entry.product} onChange={e => update("product", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}>Analysis (N-P-K)</label>
+                      <input type="text" value={entry.analysis} onChange={e => update("analysis", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}>Rate (gal/ac/app)</label>
+                      <input type="number" value={entry.rate} onChange={e => update("rate", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}>Solution Wt (lbs/gal)</label>
+                      <input type="number" value={entry.lbsPerGal} onChange={e => update("lbsPerGal", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}># Applications</label>
+                      <input type="number" value={entry.apps} onChange={e => update("apps", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display:"block",fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"#5a9e8a",marginBottom:6 }}>Date</label>
+                      <input type="date" value={entry.date} onChange={e => update("date", e.target.value)}
+                        style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.07)",border:"1px solid #2a6a5a",color:"#e8e0c8",padding:"9px 12px",fontSize:14,fontFamily:"Georgia, serif",borderRadius:2,outline:"none" }} />
+                    </div>
+                    <button type="button" onClick={() => setForm({ ...form, fertigationLog: form.fertigationLog.filter((_,i) => i !== idx) })}
+                      style={{ alignSelf:"flex-end",background:"#1a4a3a",border:"none",color:"#80c8b0",padding:"9px 14px",fontSize:13,fontFamily:"inherit",cursor:"pointer",borderRadius:2 }}>✕ Remove</button>
+                  </div>
+                );
+              })}
+              <button type="button"
+                onClick={() => setForm({ ...form, fertigationLog: [...(form.fertigationLog||[]), { product:"", analysis:"", rate:"", lbsPerGal:"", apps:"1", date:"" }] })}
+                style={{ background:"rgba(60,120,100,0.1)",border:"1px dashed #2a6a5a",color:"#5a9e8a",padding:"9px 20px",fontSize:12,fontFamily:"inherit",cursor:"pointer",letterSpacing:"0.1em",textTransform:"uppercase",borderRadius:2 }}>
+                + Add Fertigation Event
+              </button>
+            </div>
+          </>)}
 
           <SectionHeader color="#7a5a2a" label="▸ Spray Log" />
           <div style={{ marginBottom: 24 }}>
@@ -1620,11 +1773,29 @@ export default function App({ user }) {
                 );
               })}
 
+              {/* Fertigation Log */}
+              {(r.fertigationLog || []).length > 0 && (
+                <CardSection label="💧 Fertigation Log" color="#4a8a7a">
+                  {(r.fertigationLog || []).map((entry, idx) => (
+                    <div key={idx} style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:idx < r.fertigationLog.length-1 ? 10 : 0 }}>
+                      {entry.product && <StatBlock label="Product" value={entry.product} icon="💧" valueColor="#5ab8a0" />}
+                      {entry.analysis && <StatBlock label="Analysis" value={entry.analysis} icon="🧪" valueColor="#5ab8a0" />}
+                      {entry.rate && <StatBlock label="Rate" value={`${entry.rate} gal/ac/app`} icon="💉" valueColor="#5ab8a0" />}
+                      {entry.apps && <StatBlock label="Applications" value={entry.apps} icon="🔁" valueColor="#5ab8a0" />}
+                      {entry.date && <StatBlock label="Date" value={formatDate(entry.date)} icon="📆" valueColor="#5ab8a0" />}
+                    </div>
+                  ))}
+                </CardSection>
+              )}
+
               {/* Fertilizer Totals — all crops */}
               {(() => {
                 const secNPKs = rcfg.fertSections.map(sec => calcSectionNPK(r, sec)).filter(Boolean);
-                if (!secNPKs.length) return null;
-                const [totN, totP, totK] = secNPKs.reduce((acc, [n,p,k]) => [acc[0]+n, acc[1]+p, acc[2]+k], [0,0,0]);
+                const fertigNPK = calcFertigationLogNPK(r);
+                const fertigHas = fertigNPK[0] > 0 || fertigNPK[1] > 0 || fertigNPK[2] > 0;
+                if (!secNPKs.length && !fertigHas) return null;
+                const base = secNPKs.reduce((acc, [n,p,k]) => [acc[0]+n, acc[1]+p, acc[2]+k], [0,0,0]);
+                const [totN, totP, totK] = [base[0]+fertigNPK[0], base[1]+fertigNPK[1], base[2]+fertigNPK[2]];
                 const fmt = v => v > 0 ? `${v.toFixed(1)} lbs/ac` : null;
                 return (totN > 0 || totP > 0 || totK > 0) ? (
                   <CardSection label="📊 N-P-K Totals" color="#6a8a3a">
