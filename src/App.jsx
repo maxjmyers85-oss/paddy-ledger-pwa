@@ -166,7 +166,7 @@ const CROP_CONFIGS = {
       { label: "CA Long Grain", items: ["L-204","L-205","L-206"] },
       { label: "Other", items: ["Jasmine","Basmati","Arborio","Glutinous","Brown Rice","Wild Rice","Other"] },
     ],
-    yieldLabel: "Total Harvest (lbs)",
+    yieldLabel: "Total Harvest (cwt)", yieldUnit: "cwt",
     extraFields: [],
     fertSections: [FS.aqua, FS.starter, FS.topdress],
     showNPK: true,
@@ -180,7 +180,7 @@ const CROP_CONFIGS = {
       "Zenith","Brigade","Rugged","Revenge","Tempest","Momentum",
       "CalRed","Hypeel 45","Imperial","Blazer","Other"
     ],
-    yieldLabel: "Total Harvest (tons)",
+    yieldLabel: "Total Harvest (tons)", yieldUnit: "tons",
     extraFields: [
       { label: "Brix", field: "brix", type: "number" },
       { label: "Processor / Contract", field: "processor", type: "text" },
@@ -192,7 +192,7 @@ const CROP_CONFIGS = {
   wheat: {
     label: "Wheat", icon: "🌿",
     varieties: ["WB4458","WB4303","Yecora Rojo","Patwin","UC Drought Tolerant","Other"],
-    yieldLabel: "Total Harvest (lbs)",
+    yieldLabel: "Total Harvest (cwt)", yieldUnit: "cwt",
     extraFields: [
       { label: "Seeding Rate (lbs/ac)", field: "seedingRate", type: "number" },
       { label: "Protein %", field: "protein", type: "number" },
@@ -204,7 +204,7 @@ const CROP_CONFIGS = {
   corn: {
     label: "Corn", icon: "🌽",
     varieties: ["DeKalb DKC","Pioneer P","NK Brand","Syngenta","Other"],
-    yieldLabel: "Total Harvest (lbs)",
+    yieldLabel: "Total Harvest (bu)", yieldUnit: "bu",
     extraFields: [
       { label: "Population (seeds/ac)", field: "population", type: "number" },
     ],
@@ -438,9 +438,11 @@ function PrintModal({ r, onClose }) {
             <Row label="Growth Days" value={days !== null ? `${days} days` : null} />
 {r.yield_lbs > 0 && (() => {
               const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
-              const isTons = rcfg.yieldLabel.includes("tons");
-              const displayVal = isTons ? `${(r.yield_lbs / 2000).toFixed(1)} tons` : `${Number(r.yield_lbs).toLocaleString()} lbs`;
-              const perAc = r.acres > 0 ? (isTons ? `${(r.yield_lbs / 2000 / parseFloat(r.acres)).toFixed(1)} tons/ac` : `${(r.yield_lbs / parseFloat(r.acres)).toFixed(0)} lbs/ac`) : null;
+              const unit = rcfg.yieldUnit || "lbs";
+              const val = Number(r.yield_lbs);
+              const displayVal = `${Number.isInteger(val) ? val.toLocaleString() : val.toFixed(1)} ${unit}`;
+              const acres = parseFloat(r.acres);
+              const perAc = acres > 0 ? `${(val / acres).toFixed(1)} ${unit}/ac` : null;
               return (<>
                 <Row label="Acres" value={r.acres > 0 ? `${r.acres} ac` : null} />
                 <Row label="Total Harvest" value={displayVal} />
@@ -586,7 +588,12 @@ function TicketModal({ tickets, setTickets, records, setRecords, onClose }) {
     });
     setRecords(prev => prev.map(r => {
       const total = byField[r.fieldNumber];
-      if (total !== undefined) return { ...r, yield_lbs: Math.round(total) };
+      if (total !== undefined) {
+        const unit = (CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice).yieldUnit || "lbs";
+        const divisors = { cwt: 100, tons: 2000, bu: 56, lbs: 1 };
+        const converted = Math.round(total / (divisors[unit] || 1) * 10) / 10;
+        return { ...r, yield_lbs: converted };
+      }
       return r;
     }));
     setInput("");
@@ -601,7 +608,12 @@ function TicketModal({ tickets, setTickets, records, setRecords, onClose }) {
     newTickets.forEach(t => { if (t.field) byField[t.field] = (byField[t.field] || 0) + (t.dryWt || 0); });
     setRecords(prev => prev.map(r => {
       const total = byField[r.fieldNumber];
-      return { ...r, yield_lbs: total !== undefined ? Math.round(total) : r.yield_lbs };
+      if (total !== undefined) {
+        const unit = (CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice).yieldUnit || "lbs";
+        const divisors = { cwt: 100, tons: 2000, bu: 56, lbs: 1 };
+        return { ...r, yield_lbs: Math.round(total / (divisors[unit] || 1) * 10) / 10 };
+      }
+      return { ...r };
     }));
   }
 
@@ -733,12 +745,12 @@ function VarietyModal({ records, onClose }) {
   const stats = {};
   records.forEach(r => {
     if (!r.variety) return;
-    if (!stats[r.variety]) stats[r.variety] = { acres: 0, totalYieldLbs: 0, fields: 0, yieldCount: 0 };
+    if (!stats[r.variety]) stats[r.variety] = { acres: 0, totalYield: 0, fields: 0, yieldCount: 0, cropType: r.cropType || "rice" };
     const ac = parseFloat(r.acres) || 0;
     stats[r.variety].acres += ac;
     stats[r.variety].fields += 1;
     if (r.yield_lbs > 0) {
-      stats[r.variety].totalYieldLbs += r.yield_lbs;
+      stats[r.variety].totalYield += Number(r.yield_lbs);
       stats[r.variety].yieldCount += 1;
     }
   });
@@ -750,18 +762,20 @@ function VarietyModal({ records, onClose }) {
   const tdS = { padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #1e1e26", color: "#e4e4e8" };
   const tdN = { padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #1e1e26", color: "#9ec89e", textAlign: "right", fontVariantNumeric: "tabular-nums" };
 
+  const fmtYield = (val, unit) => val > 0 ? `${Number.isInteger(val) ? val.toLocaleString() : val.toFixed(1)} ${unit}` : "—";
+  const fmtYieldAc = (val, acres, unit) => val > 0 && acres > 0 ? `${(val / acres).toFixed(1)} ${unit}/ac` : "—";
+
   const printVariety = () => {
     const rows = varieties.map(([variety, v]) => {
-      const avgCwtAc = v.yieldCount > 0 && v.acres > 0 ? (v.totalYieldLbs / 100 / v.acres).toFixed(1) : "—";
-      const totalCwt = v.totalYieldLbs > 0 ? (v.totalYieldLbs / 100).toFixed(1) : "—";
-      return `<tr><td>${variety}</td><td style="text-align:right">${v.fields}</td><td style="text-align:right">${v.acres.toFixed(1)}</td><td style="text-align:right">${totalCwt}</td><td style="text-align:right">${avgCwtAc}</td></tr>`;
+      const unit = (CROP_CONFIGS[v.cropType] || CROP_CONFIGS.rice).yieldUnit || "lbs";
+      return `<tr><td>${variety}</td><td style="text-align:right">${v.fields}</td><td style="text-align:right">${v.acres.toFixed(1)}</td><td style="text-align:right">${fmtYield(v.totalYield,unit)}</td><td style="text-align:right">${fmtYieldAc(v.totalYield,v.acres,unit)}</td></tr>`;
     }).join("");
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Variety Summary</title>
     <style>body{font-family:Georgia,serif;color:#1a1a0a;padding:32px 40px}h1{font-size:22px;color:#242432;margin-bottom:4px}p{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:24px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#eef4d8;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#383848;border-bottom:2px solid #c8d880}td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafdf0}.footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between}@media print{@page{margin:.5in}}</style>
     </head><body>
     <h1>🌾 Variety Summary Report</h1>
     <p>Golden State Grower · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</p>
-    <table><thead><tr><th>Variety</th><th style="text-align:right">Fields</th><th style="text-align:right">Total Acres</th><th style="text-align:right">Total Yield (cwt)</th><th style="text-align:right">Avg Yield (cwt/ac)</th></tr></thead>
+    <table><thead><tr><th>Variety</th><th style="text-align:right">Fields</th><th style="text-align:right">Total Acres</th><th style="text-align:right">Total Yield</th><th style="text-align:right">Avg Yield/Acre</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div class="footer"><span>Golden State Grower — Variety Summary</span><span>Total Acres: ${totalAcres.toFixed(1)}</span></div>
     <script>window.onload=()=>window.print()<\/script></body></html>`;
@@ -790,30 +804,30 @@ function VarietyModal({ records, onClose }) {
               </div>
               <table style={{ width:"100%",borderCollapse:"collapse" }}>
                 <thead><tr style={{ background:"rgba(255,255,255,0.04)" }}>
-                  {["Variety","Fields","Total Acres","Total Yield (cwt)","Avg Yield (cwt/ac)"].map(h => <th key={h} style={thS}>{h}</th>)}
+                  {["Variety","Crop","Fields","Total Acres","Total Yield","Avg Yield/Acre"].map(h => <th key={h} style={thS}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {varieties.map(([variety, v]) => {
-                    const avgCwtAc = v.yieldCount > 0 && v.acres > 0 ? (v.totalYieldLbs/100/v.acres).toFixed(1) : "—";
-                    const totalCwt = v.totalYieldLbs > 0 ? (v.totalYieldLbs/100).toLocaleString(undefined,{maximumFractionDigits:1}) : "—";
+                    const cfg = CROP_CONFIGS[v.cropType] || CROP_CONFIGS.rice;
+                    const unit = cfg.yieldUnit || "lbs";
                     return (
                       <tr key={variety}>
                         <td style={{ ...tdS,color:"#9ec89e",fontWeight:600 }}>{variety}</td>
+                        <td style={tdS}>{cfg.icon} {cfg.label}</td>
                         <td style={tdN}>{v.fields}</td>
                         <td style={tdN}>{v.acres.toFixed(1)}</td>
-                        <td style={tdN}>{totalCwt}</td>
-                        <td style={{ ...tdN,color:"#90d8c8" }}>{avgCwtAc}</td>
+                        <td style={tdN}>{fmtYield(v.totalYield, unit)}</td>
+                        <td style={{ ...tdN,color:"#90d8c8" }}>{fmtYieldAc(v.totalYield, v.acres, unit)}</td>
                       </tr>
                     );
                   })}
                   <tr style={{ background:"rgba(255,255,255,0.04)",fontWeight:700 }}>
                     <td style={{ ...tdS,color:"#9ec89e",borderTop:"2px solid #2e2e38" }}>TOTAL</td>
+                    <td style={{ ...tdS,borderTop:"2px solid #2e2e38" }}>—</td>
                     <td style={{ ...tdN,borderTop:"2px solid #2e2e38" }}>{records.length}</td>
                     <td style={{ ...tdN,borderTop:"2px solid #2e2e38" }}>{totalAcres.toFixed(1)}</td>
-                    <td style={{ ...tdN,borderTop:"2px solid #2e2e38" }}>{(varieties.reduce((s,[,v])=>s+v.totalYieldLbs,0)/100).toLocaleString(undefined,{maximumFractionDigits:1})}</td>
-                    <td style={{ ...tdN,borderTop:"2px solid #2e2e38",color:"#90d8c8" }}>
-                      {(() => { const ta=varieties.reduce((s,[,v])=>s+v.acres,0); const ty=varieties.reduce((s,[,v])=>s+v.totalYieldLbs,0); return ta>0&&ty>0?(ty/100/ta).toFixed(1):"—"; })()}
-                    </td>
+                    <td style={{ ...tdN,borderTop:"2px solid #2e2e38" }}>—</td>
+                    <td style={{ ...tdN,borderTop:"2px solid #2e2e38",color:"#90d8c8" }}>—</td>
                   </tr>
                 </tbody>
               </table>
@@ -841,8 +855,8 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     { key:"growthDays",      label:"Growth Days",           group:"General" },
     { key:"yield_raw",        label:"Yield (with units)",    group:"General" },
     { key:"yield_lbs",       label:"Yield (raw number)",    group:"General" },
-    { key:"yield_cwt",       label:"Yield (cwt, rice)",     group:"General" },
-    { key:"yield_cwtac",     label:"Yield (cwt/ac, rice)",  group:"General" },
+    { key:"yield_cwt",       label:"Yield (with unit)",     group:"General" },
+    { key:"yield_cwtac",     label:"Yield per Acre",        group:"General" },
     { key:"notes",           label:"Notes",                 group:"General" },
     { key:"aquaRate",        label:"Aqua Rate (gal/ac)",    group:"Fertilizer" },
     { key:"aquaDate",        label:"Aqua Date",             group:"Fertilizer" },
@@ -902,9 +916,9 @@ function ReportBuilderModal({ records, allYears, onClose }) {
     const rcfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
     if (key === "cropType") return (CROP_CONFIGS[r.cropType||"rice"]||{label:r.cropType||"Rice"}).label;
     if (key === "growthDays") { if(!r.plantDate||!r.yieldDate) return "—"; return Math.round((new Date(r.yieldDate)-new Date(r.plantDate))/86400000)+"d"; }
-    if (key === "yield_raw") { if(!r.yield_lbs||r.yield_lbs<=0) return "—"; const cfg=CROP_CONFIGS[r.cropType||"rice"]||CROP_CONFIGS.rice; return `${Number(r.yield_lbs).toLocaleString()} ${cfg.yieldLabel.includes("tons")?"tons":"lbs"}`; }
-    if (key === "yield_cwt") return r.yield_lbs>0?(r.yield_lbs/100).toFixed(1):"—";
-    if (key === "yield_cwtac") { const ac=parseFloat(r.acres)||0; return r.yield_lbs>0&&ac>0?(r.yield_lbs/100/ac).toFixed(1):"—"; }
+    if (key === "yield_raw") { if(!r.yield_lbs||r.yield_lbs<=0) return "—"; const cfg=CROP_CONFIGS[r.cropType||"rice"]||CROP_CONFIGS.rice; const u=cfg.yieldUnit||"lbs"; const v=Number(r.yield_lbs); return `${Number.isInteger(v)?v.toLocaleString():v.toFixed(1)} ${u}`; }
+    if (key === "yield_cwt") { const u=(CROP_CONFIGS[r.cropType||"rice"]||CROP_CONFIGS.rice).yieldUnit||"lbs"; return r.yield_lbs>0?`${Number(r.yield_lbs).toLocaleString()} ${u}`:"—"; }
+    if (key === "yield_cwtac") { const cfg=CROP_CONFIGS[r.cropType||"rice"]||CROP_CONFIGS.rice; const u=cfg.yieldUnit||"lbs"; const ac=parseFloat(r.acres)||0; return r.yield_lbs>0&&ac>0?`${(Number(r.yield_lbs)/ac).toFixed(1)} ${u}/ac`:"—"; }
     if (["plantDate","yieldDate","aquaDate","starterDate","topdressDate","preplantDate","sidedressDate","dormantDate","springDate","hullSplitDate"].includes(key)) return r[key]?formatDate(r[key]):"—";
     if (key === "fertigCount") return (r.fertigationLog||[]).length || "—";
     if (key === "sprayCount") return (r.sprayLog||[]).length || "—";
@@ -1116,7 +1130,9 @@ function YoYModal({ records, allYears, onClose }) {
   const yieldLabel = r => {
     const cfg = CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice;
     if (!r.yield_lbs || r.yield_lbs <= 0) return "—";
-    return `${Number(r.yield_lbs).toLocaleString()} ${cfg.yieldLabel.includes("tons") ? "tons" : "lbs"}`;
+    const unit = cfg.yieldUnit || "lbs";
+    const val = Number(r.yield_lbs);
+    return `${Number.isInteger(val) ? val.toLocaleString() : val.toFixed(1)} ${unit}`;
   };
 
   const filteredRecords = filterCrop === "all" ? records : records.filter(r => (r.cropType||"rice") === filterCrop);
@@ -1788,12 +1804,13 @@ export default function App({ user }) {
                   : <StatBlock label="Planted" value={formatDate(r.plantDate)} icon="🌱" />}
                 <StatBlock label="Harvest" value={formatDate(r.yieldDate)} icon="🌾" />
 {r.yield_lbs > 0 && (() => {
-                  const cwt = (r.yield_lbs / 100).toFixed(1);
-                  const cwtAc = r.acres > 0 ? (r.yield_lbs / 100 / parseFloat(r.acres)).toFixed(1) : null;
+                  const unit = (CROP_CONFIGS[r.cropType] || CROP_CONFIGS.rice).yieldUnit || "lbs";
+                  const val = Number(r.yield_lbs);
+                  const acres = parseFloat(r.acres);
+                  const perAc = acres > 0 ? (val / acres).toFixed(1) : null;
                   return (<>
-                    <StatBlock label="Yield (lbs)" value={`${Number(r.yield_lbs).toLocaleString()} lbs`} icon="⚖️" />
-                    <StatBlock label="Yield (cwt)" value={`${Number(cwt).toLocaleString()} cwt`} icon="🌾" valueColor="#d8e890" />
-                    {cwtAc && <StatBlock label="Yield (cwt/ac)" value={`${cwtAc} cwt/ac`} icon="📐" valueColor="#90d8c8" />}
+                    <StatBlock label={`Yield (${unit})`} value={`${Number.isInteger(val) ? val.toLocaleString() : val.toFixed(1)} ${unit}`} icon="⚖️" valueColor="#d8e890" />
+                    {perAc && <StatBlock label={`Yield (${unit}/ac)`} value={`${perAc} ${unit}/ac`} icon="📐" valueColor="#90d8c8" />}
                   </>);
                 })()}
                 {days !== null && <StatBlock label="Growth Days" value={`${days}d`} icon="📅" valueColor={sc} />}
