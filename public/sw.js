@@ -1,4 +1,4 @@
-const CACHE = "paddy-ledger-v3";
+const CACHE = "paddy-ledger-v4";
 const SHELL = ["/", "/index.html"];
 
 self.addEventListener("install", e => {
